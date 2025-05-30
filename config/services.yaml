@@ -1,6 +1,8 @@
 services:
   ApiPlatform\IApi:
     class: ApiPlatform\Api
+    arguments:
+      apiPlatformVersion: '%api_platform_version'
 
   ApiPlatform\Controller\IApiRouter:
     class: ApiPlatform\Controller\ApiRouter

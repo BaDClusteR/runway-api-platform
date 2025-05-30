@@ -30,7 +30,8 @@ class Api implements IApi {
         protected IRequest                          $request,
         protected IAuth                             $auth,
         protected ITokenStorage                     $tokenStorage,
-        protected IResponse                         $response
+        protected IResponse                         $response,
+        protected string                            $apiPlatformVersion
     ) {}
 
     /**
@@ -165,6 +166,6 @@ class Api implements IApi {
     }
 
     public function getVersion(): string {
-        return '1.0.0';
+        return $this->apiPlatformVersion;
     }
 }
