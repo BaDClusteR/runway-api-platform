@@ -1,0 +1,14 @@
+services:
+  ApiPlatform\Endpoint\Auth:
+    tags:
+      - name: api_endpoint_collection
+
+  ApiPlatform\Endpoint\Ping:
+    tags:
+      - name: api_endpoint_collection
+
+  ApiPlatform\Endpoint\Schema:
+    arguments:
+      response: '@response.json.successful'
+    tags:
+      - name: api_endpoint_collection

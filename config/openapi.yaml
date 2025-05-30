@@ -1,0 +1,16 @@
+services:
+  ApiPlatform\OpenAPI\IOpenApiGenerator:
+    class: ApiPlatform\OpenAPI\OpenApiGenerator
+    arguments:
+      api: '@ApiPlatform\IApi'
+      endpointPrefix: '/api/'
+      tokenHeader: '#API_TOKEN_HEADER'
+
+  ApiPlatform\OpenAPI\Provider\IOpenApiEndpointInfoProvider:
+    class: ApiPlatform\OpenAPI\Provider\OpenApiEndpointInfoProvider
+
+  ApiPlatform\OpenAPI\Provider\Arguments\IOpenApiEndpointArgumentInfoProvider:
+    class: ApiPlatform\OpenAPI\Provider\Arguments\OpenApiEndpointArgumentInfoProvider
+
+  ApiPlatform\OpenAPI\Provider\Response\IOpenApiEndpointResponseSchemaProvider:
+    class: ApiPlatform\OpenAPI\Provider\Response\OpenApiEndpointResponseSchemaProvider

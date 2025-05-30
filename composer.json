@@ -1,0 +1,27 @@
+{
+  "name": "bad_cluster/runway-api-platform",
+  "type": "library",
+  "description": "API platform for Runway",
+  "keywords": ["runway", "api", "api-platform"],
+  "license": "BSD-3-Clause",
+  "authors": [
+    {"name": "BaD ClusteR", "email": "admin@badcluster.ru"}
+  ],
+  "require": {
+    "php": ">=8.4",
+    "ext-simplexml": "*",
+    "ext-dom": "*",
+    "ext-zip": "*",
+    "bad_cluster/runway": "dev-release-1.0.1"
+  },
+  "require-dev": {
+    "roave/security-advisories": "dev-latest"
+  },
+  "autoload": {
+    "psr-4": {"ApiPlatform\\" : "src/"},
+    "files": ["bootstrap.php"]
+  },
+  "autoload-dev": {
+    "psr-4": {"AplPlatform\\Tests\\": "tests/"}
+  }
+}
