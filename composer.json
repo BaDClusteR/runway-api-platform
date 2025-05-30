@@ -12,7 +12,7 @@
     "ext-simplexml": "*",
     "ext-dom": "*",
     "ext-zip": "*",
-    "bad_cluster/runway": "dev-release-1.0.1"
+    "bad_cluster/runway": "1.*"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest"
