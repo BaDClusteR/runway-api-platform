@@ -24,7 +24,7 @@ class ApiRouter implements IApiRouter {
     ) {}
 
     public function route(
-        string  $apiVersion,
+        string  $apiVersion = "v1",
         ?string $section = null,
         ?string $action = null,
         ?string $identifier = null

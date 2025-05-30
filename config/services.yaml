@@ -14,28 +14,25 @@ services:
   ApiPlatform\Controller\System\IApiExceptionResponseController:
     class: ApiPlatform\Controller\System\ApiExceptionResponseController
 
-  ApiPlatform\Provider\Endpoints\IEndpointsProvider:
-    class: ApiPlatform\Provider\Endpoints\EndpointsProvider
+  ApiPlatform\Core\Provider\Endpoints\IEndpointsProvider:
+    class: ApiPlatform\Core\Provider\Endpoints\EndpointsProvider
 
-  ApiPlatform\Provider\EndpointMethodParameters\IEndpointMethodParametersProvider:
-    class: ApiPlatform\Provider\EndpointMethodParameters\EndpointMethodParametersProvider
+  ApiPlatform\Core\Provider\EndpointMethodParameters\IEndpointMethodParametersProvider:
+    class: ApiPlatform\Core\Provider\EndpointMethodParameters\EndpointMethodParametersProvider
 
-  ApiPlatform\Validator\IEndpointMethodParameterValidator:
-    class: ApiPlatform\Validator\EndpointMethodParameterValidator
+  ApiPlatform\Core\Validator\IEndpointMethodParameterValidator:
+    class: ApiPlatform\Core\Validator\EndpointMethodParameterValidator
 
-  ApiPlatform\Provider\EndpointMethodParameterValue\IEndpointMethodParameterValidator:
-    class: ApiPlatform\Provider\EndpointMethodParameterValue\EndpointMethodParameterValidator
+  ApiPlatform\Core\Provider\EndpointMethodParameterValue\IEndpointMethodParameterValidator:
+    class: ApiPlatform\Core\Provider\EndpointMethodParameterValue\EndpointMethodParameterValidator
 
-  ApiPlatform\Provider\EndpointMethodParameterValue\IEndpointMethodParameterValueProvider:
-    class: ApiPlatform\Provider\EndpointMethodParameterValue\EndpointMethodParameterValueProvider
+  ApiPlatform\Core\Provider\EndpointMethodParameterValue\IEndpointMethodParameterValueProvider:
+    class: ApiPlatform\Core\Provider\EndpointMethodParameterValue\EndpointMethodParameterValueProvider
 
-  ApiPlatform\Storage\ITokenStorage:
-    class: ApiPlatform\Storage\TokenStorage
+  ApiPlatform\Core\Storage\ITokenStorage:
+    class: ApiPlatform\Core\Storage\TokenStorage
     arguments:
       tokenHeader: '#API_TOKEN_HEADER'
-
-  ApiPlatform\V1\IApi:
-    class: ApiPlatform\Api
 
   ApiPlatform\Core\ICrypto:
     class: ApiPlatform\Core\Crypto
@@ -45,8 +42,8 @@ services:
       hashAlgo: 'sha256'
       sha2Length: 32
 
-  ApiPlatform\Singleton\IAuth:
-    class: ApiPlatform\Singleton\Auth
+  ApiPlatform\Core\Singleton\IAuth:
+    class: ApiPlatform\Core\Singleton\Auth
     arguments:
       key: '#API_CRYPTO_KEY'
       keyLength: '#API_CRYPTO_KEY_LENGTH'
@@ -54,6 +51,6 @@ services:
   response.json.successful:
     class: Runway\Request\Response
     arguments:
-      code: 200,
+      code: 200
       headers:
         Content-Type: application/json
