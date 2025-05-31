@@ -1,10 +1,10 @@
 routes:
   api_simple_action:
-    path: /api/{section}
+    path: /api/{action}
     controller: ApiPlatform\Controller\IApiRouter::route
 
   api_action:
-    path: /api/{section}/{action}
+    path: /api/{action}/{identifier}
     controller: ApiPlatform\Controller\IApiRouter::route
 
   api_action_entity:
