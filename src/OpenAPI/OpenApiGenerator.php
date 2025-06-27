@@ -31,6 +31,8 @@ class OpenApiGenerator implements IOpenApiGenerator {
     public function generateOpenApiSpec(): array {
         $this->definePathsAndSchemas();
 
+        ksort($this->paths, SORT_STRING);
+
         return [
             'openapi'    => $this->getOpenApiVersion(),
             'info'       => $this->getInfo(),
@@ -41,6 +43,8 @@ class OpenApiGenerator implements IOpenApiGenerator {
     }
 
     protected function getComponents(): array {
+        ksort($this->schemas, SORT_STRING);
+
         return [
             'schemas'         => $this->schemas,
             'securitySchemes' => $this->getSecuritySchemes()
