@@ -26,7 +26,7 @@ class ApiRouter implements IApiRouter {
     public function route(
         string  $apiVersion = "v1",
         ?string $section = null,
-        ?string $action = null,
+        ?string $subSection = null,
         ?string $identifier = null
     ): Response {
         $this->logger->debug(
@@ -34,7 +34,7 @@ class ApiRouter implements IApiRouter {
             [
                 'apiVersion' => $apiVersion,
                 'section'    => $section,
-                'action'     => $action,
+                'subSection' => $subSection,
                 'identifier' => $identifier,
                 'method'     => $this->request->getMethod(),
                 'body'       => $this->request->getBody()
@@ -45,7 +45,7 @@ class ApiRouter implements IApiRouter {
             if ($api = $this->getAPIByVersion(strtolower($apiVersion))) {
                 return $this->getResponseController()->getResponse(
                     $api->execute(
-                        $this->getApiRequestDTO($section, $action, $identifier)
+                        $this->getApiRequestDTO($section, $subSection, $identifier)
                     )
                 );
             }
@@ -63,7 +63,7 @@ class ApiRouter implements IApiRouter {
     /**
      * @throws UnprocessableContentException
      */
-    protected function getApiRequestDTO(?string $section, ?string $action, ?string $identifier): ApiRequestDTO {
+    protected function getApiRequestDTO(?string $section, ?string $subSection, ?string $identifier): ApiRequestDTO {
         $body = [];
 
         try {
@@ -82,7 +82,7 @@ class ApiRouter implements IApiRouter {
 
         return new ApiRequestDTO(
             section: $section,
-            action: $action,
+            subSection: $subSection,
             identifier: $identifier,
             method: $this->request->getMethod(),
             body: $body

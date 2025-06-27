@@ -8,7 +8,7 @@ interface IApiRouter {
     public function route(
         string  $apiVersion,
         ?string $section = null,
-        ?string $action = null,
+        ?string $subSection = null,
         ?string $identifier = null
     ): Response;
 }

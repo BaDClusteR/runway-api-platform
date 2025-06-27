@@ -66,10 +66,10 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
     protected function getPathParameterValue(ApiMethodParameterDTO $parameter, ApiRequestDTO $request): string {
         $value = match ($parameter->name) {
             "section"    => $request->section,
-            "action"     => $request->action,
+            "subSection" => $request->subSection,
             "identifier" => $request->identifier,
             default      => throw new InternalErrorException(
-                "Invalid name for path argument '{$parameter->argumentName}': {$parameter->name}. Allowed values are 'section', 'action' and 'identifier'"
+                "Invalid name for path argument '{$parameter->argumentName}': {$parameter->name}. Allowed values are 'section', 'subSection' and 'identifier'"
             )
         };
 

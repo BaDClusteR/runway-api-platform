@@ -174,10 +174,10 @@ class Api implements IApi {
         $result = array_values(
             array_filter([
                 $request->section,
-                $request->action,
                 $withIdentifier
                     ? $request->identifier
                     : null,
+                $request->subSection
             ])
         );
 

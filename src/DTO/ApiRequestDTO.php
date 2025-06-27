@@ -7,7 +7,7 @@ namespace ApiPlatform\DTO;
 readonly class ApiRequestDTO {
     public function __construct(
         public ?string $section,
-        public ?string $action,
+        public ?string $subSection,
         public ?string $identifier,
         public string  $method,
         public array   $body
