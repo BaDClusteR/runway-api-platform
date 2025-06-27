@@ -147,26 +147,41 @@ class Api implements IApi {
     }
 
     protected function getRequestEndpoint(ApiRequestDTO $request): ?ApiEndpointDTO {
-        $endpointPath = $this->buildEndpointPath($request);
+        $result = $this->findApiEndpointByPath(
+            $this->buildEndpointPath($request, true),
+            $request->method
+        );
 
+        $result ??= $this->findApiEndpointByPath(
+            $this->buildEndpointPath($request, false),
+            $request->method
+        );
+
+        return $result;
+    }
+
+    protected function findApiEndpointByPath(string $endpointPath, string $requestMethod): ?ApiEndpointDTO {
         return array_find(
             $this->endpointsProvider->getApiEndpoints(),
             static fn(ApiEndpointDTO $endpoint) => (
                 $endpoint->path === $endpointPath
-                && $endpoint->requestMethod === $request->method
+                && $endpoint->requestMethod === $requestMethod
             )
         );
-
     }
 
-    protected function buildEndpointPath(ApiRequestDTO $request): string {
-        $result = (string)$request->section;
+    protected function buildEndpointPath(ApiRequestDTO $request, bool $withIdentifier): string {
+        $result = array_values(
+            array_filter([
+                $request->section,
+                $request->action,
+                $withIdentifier
+                    ? $request->identifier
+                    : null,
+            ])
+        );
 
-        if ($request->action) {
-            $result .= ($result ? "/" : "") . $request->action;
-        }
-
-        return $result;
+        return implode("/", $result);
     }
 
     public function getVersion(): string {
