@@ -253,7 +253,13 @@ class OpenApiGenerator implements IOpenApiGenerator {
     /**
      * @throws InternalErrorException
      */
-    protected function getEndpointResponseSchema(OpenApiEndpointResponseSchemaDTO $schema): array {
+    protected function getEndpointResponseSchema(OpenApiEndpointResponseSchemaDTO|string $schema): array {
+        if (is_string($schema)) {
+            return [
+                'type' => $schema
+            ];
+        }
+
         if (empty($this->schemas[$schema->refName])) {
             $responseSchema = [];
 

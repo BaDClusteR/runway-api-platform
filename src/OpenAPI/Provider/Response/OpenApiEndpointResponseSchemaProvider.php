@@ -101,7 +101,7 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
         );
     }
 
-    protected function getChildren(ReflectionProperty $prop): ?OpenApiEndpointResponseSchemaDTO {
+    protected function getChildren(ReflectionProperty $prop): OpenApiEndpointResponseSchemaDTO|string|null {
         $parameterType = $this->getParameterType($prop);
 
         if ($parameterType === OpenApiEndpointParameterTypeEnum::TYPE_OBJECT) {
@@ -111,21 +111,30 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
                 );
             } catch (InternalErrorException) {
             }
-        }
-
-        if ($parameterType === OpenApiEndpointParameterTypeEnum::TYPE_ARRAY) {
+        } elseif ($parameterType === OpenApiEndpointParameterTypeEnum::TYPE_ARRAY) {
             /** @var Property|null $propAttribute */
             $propAttribute = $this->getFirstAttribute($prop, Property::class);
 
+            $childrenType = (string)$propAttribute?->childrenType;
+
+            if ($this->isPrimitiveType($childrenType)) {
+                return $childrenType;
+            }
+
             try {
-                return $this->getResponseSchemaDTOByFqn(
-                    (string)$propAttribute?->childrenType
-                );
+                return $this->getResponseSchemaDTOByFqn($childrenType);
             } catch (InternalErrorException) {
             }
         }
 
         return null;
+    }
+
+    protected function isPrimitiveType(string $type): bool {
+        return in_array(
+            strtolower($type),
+            ['string', 'int', 'float', 'int', 'bool']
+        );
     }
 
     /**
