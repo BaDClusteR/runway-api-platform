@@ -7,6 +7,7 @@ namespace ApiPlatform\OpenAPI;
 use ApiPlatform\Core\Provider\Endpoints\IEndpointsProvider;
 use ApiPlatform\DTO\ApiEndpointDTO;
 use ApiPlatform\Endpoint\Schema;
+use ApiPlatform\Exception\InternalErrorException;
 use ApiPlatform\IApi;
 use ApiPlatform\OpenAPI\DTO\OpenApiEndpointInfoDTO;
 use ApiPlatform\OpenAPI\DTO\OpenApiEndpointRequestParameterDTO;
@@ -28,6 +29,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
         protected string                       $tokenHeader
     ) {}
 
+    /**
+     * @throws InternalErrorException
+     */
     public function generateOpenApiSpec(): array {
         $this->definePathsAndSchemas();
 
@@ -83,6 +87,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
         ];
     }
 
+    /**
+     * @throws InternalErrorException
+     */
     protected function definePathsAndSchemas(): void {
         $this->paths = [];
         $this->schemas = $this->getErrorSchema();
@@ -115,12 +122,18 @@ class OpenApiGenerator implements IOpenApiGenerator {
             && $endpoint->method !== "generateOpenApiSchema";
     }
 
+    /**
+     * @throws InternalErrorException
+     */
     protected function getEndpointPathInfo(ApiEndpointDTO $endpoint, OpenApiEndpointInfoDTO $endpointInfo): array {
         return [
             strtolower($endpoint->requestMethod) => $this->getEndpointInfo($endpointInfo)
         ];
     }
 
+    /**
+     * @throws InternalErrorException
+     */
     protected function getEndpointInfo(OpenApiEndpointInfoDTO $endpointInfo): array {
         $result = [];
 
@@ -209,6 +222,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
         );
     }
 
+    /**
+     * @throws InternalErrorException
+     */
     protected function getEndpointResponses(OpenApiEndpointInfoDTO $endpointInfo): array {
         return [
             $this->getSuccessfulResponseCode($endpointInfo) => $this->getSuccessfulResponse($endpointInfo),
@@ -223,6 +239,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
             : '200';
     }
 
+    /**
+     * @throws InternalErrorException
+     */
     protected function getSuccessfulResponse(OpenApiEndpointInfoDTO $endpointInfo): array {
         return $this->getEndpointResponseSchema($endpointInfo->responseSchema);
     }
@@ -231,6 +250,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
         return empty($endpointInfo->responseSchema->schema);
     }
 
+    /**
+     * @throws InternalErrorException
+     */
     protected function getEndpointResponseSchema(OpenApiEndpointResponseSchemaDTO $schema): array {
         if (empty($this->schemas[$schema->refName])) {
             $responseSchema = [];
@@ -245,11 +267,23 @@ class OpenApiGenerator implements IOpenApiGenerator {
 
             foreach ($schema->schema as $field) {
                 if ($field->type === OpenApiEndpointParameterTypeEnum::TYPE_ARRAY) {
+                    if (!$field->children) {
+                        throw new InternalErrorException(
+                            "Error while generating schema for '$schema->refName': field '$field->name' is array, but the items type is not defined."
+                        );
+                    }
+
                     $responseSchema[$field->name] = [
                         'type'  => "array",
                         'items' => $this->getEndpointResponseSchema($field->children)
                     ];
                 } elseif ($field->type === OpenApiEndpointParameterTypeEnum::TYPE_OBJECT) {
+                    if (!$field->children) {
+                        throw new InternalErrorException(
+                            "Error while generating schema for '$schema->refName': field '$field->name' is object, but its type is not defined."
+                        );
+                    }
+
                     $responseSchema[$field->name] = [
                         'type'       => "object",
                         'properties' => $this->getEndpointResponseSchema($field->children)

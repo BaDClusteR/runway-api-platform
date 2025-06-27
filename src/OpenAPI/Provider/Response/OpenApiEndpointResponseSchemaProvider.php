@@ -64,9 +64,6 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
             : null;
     }
 
-    /**
-     * @throws InternalErrorException
-     */
     protected function getResponseSchema(ReflectionClass $dtoReflection): array {
         return array_map(
             fn(ReflectionProperty $prop): OpenApiEndpointResponseParameterDTO => $this->buildOpenApiResponseParameter(
@@ -80,9 +77,6 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
         return $responseDTOReflection->getProperties(ReflectionProperty::IS_PUBLIC);
     }
 
-    /**
-     * @throws InternalErrorException
-     */
     protected function buildOpenApiResponseParameter(ReflectionProperty $prop): OpenApiEndpointResponseParameterDTO {
         /** @var Property|null $infoAttribute */
         $infoAttribute = $this->getFirstAttribute($prop, Property::class);
@@ -107,25 +101,28 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
         );
     }
 
-    /**
-     * @throws InternalErrorException
-     */
     protected function getChildren(ReflectionProperty $prop): ?OpenApiEndpointResponseSchemaDTO {
         $parameterType = $this->getParameterType($prop);
 
         if ($parameterType === OpenApiEndpointParameterTypeEnum::TYPE_OBJECT) {
-            return $this->getResponseSchemaDTOByFqn(
-                (string)$prop->getType()?->getName()
-            );
+            try {
+                return $this->getResponseSchemaDTOByFqn(
+                    (string)$prop->getType()?->getName()
+                );
+            } catch (InternalErrorException) {
+            }
         }
 
         if ($parameterType === OpenApiEndpointParameterTypeEnum::TYPE_ARRAY) {
             /** @var Property|null $propAttribute */
             $propAttribute = $this->getFirstAttribute($prop, Property::class);
 
-            return $this->getResponseSchemaDTOByFqn(
-                (string)$propAttribute?->childrenType
-            );
+            try {
+                return $this->getResponseSchemaDTOByFqn(
+                    (string)$propAttribute?->childrenType
+                );
+            } catch (InternalErrorException) {
+            }
         }
 
         return null;
