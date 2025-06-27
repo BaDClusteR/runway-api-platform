@@ -38,8 +38,8 @@ class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
             operationId: (string)($endpointAttribute?->operationId ?: $endpointAttribute?->title),
             arguments: $this->getArguments($methodReflection, $endpoint),
             isPublic: $endpoint->isPublic,
-            isDeprecated: false,
-            responseSchema: $this->responseSchemaProvider->getEndpointResponseSchema($endpoint)
+            responseSchema: $this->responseSchemaProvider->getEndpointResponseSchema($endpoint),
+            isDeprecated: false
         );
     }
 

@@ -15,7 +15,7 @@ readonly class OpenApiEndpointInfoDTO {
         public string                           $operationId,
         public array                            $arguments,
         public bool                             $isPublic,
-        public bool                             $isDeprecated = false,
-        public OpenApiEndpointResponseSchemaDTO $responseSchema
+        public OpenApiEndpointResponseSchemaDTO $responseSchema,
+        public bool                             $isDeprecated = false
     ) {}
 }
