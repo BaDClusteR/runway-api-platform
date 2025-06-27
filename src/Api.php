@@ -101,7 +101,11 @@ class Api implements IApi {
         $result = [];
 
         foreach ($parameters as $parameter) {
-            $result[$parameter->argumentName] = $this->castArgumentValueToType($parameter->value, $parameter->type);
+            if ($parameter->isNullable && $parameter->value === null) {
+                $result[$parameter->argumentName] = null;
+            } else {
+                $result[$parameter->argumentName] = $this->castArgumentValueToType($parameter->value, $parameter->type);
+            }
         }
 
         return $result;
