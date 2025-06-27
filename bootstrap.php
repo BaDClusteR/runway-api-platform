@@ -8,3 +8,4 @@ const API_PLATFORM_CONFIG_ROOT = API_PLATFORM_ROOT . "/config";
 $pathsProvider = PathsProvider::getInstance();
 $pathsProvider->addConfigDirectory(API_PLATFORM_CONFIG_ROOT);
 $pathsProvider->addEnvFilePath(API_PLATFORM_ROOT . "/.env");
+$pathsProvider->addEnvFilePath(API_PLATFORM_ROOT . "/.env.local");
