@@ -12,6 +12,7 @@ readonly class Property {
         public string $description = '',
         public string $format = '',
         public array  $enum = [],
-        public mixed  $example = null
+        public mixed  $example = null,
+        public string $childrenType = ''
     ) {}
 }

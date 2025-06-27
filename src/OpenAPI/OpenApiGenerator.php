@@ -228,33 +228,38 @@ class OpenApiGenerator implements IOpenApiGenerator {
     }
 
     protected function getEndpointResponseSchema(OpenApiEndpointResponseSchemaDTO $schema): array {
-        $responseSchema = [];
+        if (empty($this->schemas[$schema->refName])) {
+            $responseSchema = [];
 
-        if ($schema->description) {
-            $responseSchema['description'] = $schema->description;
-        }
-
-        if (empty($schema->schema)) {
-            return $responseSchema;
-        }
-
-        foreach ($schema->schema as $field) {
-            if ($field->type === OpenApiEndpointParameterTypeEnum::TYPE_ARRAY) {
-                $responseSchema[$field->name] = [
-                    'type'  => "array",
-                    'items' => $this->getEndpointResponseSchema($field->children)
-                ];
-            } elseif ($field->type === OpenApiEndpointParameterTypeEnum::TYPE_OBJECT) {
-                $responseSchema[$field->name] = $this->getEndpointResponseSchema($field->children);
-            } else {
-                $responseSchema[$field->name] = $this->getEndpointParameterSchema($field);
+            if ($schema->description) {
+                $responseSchema['description'] = $schema->description;
             }
-        }
 
-        $this->schemas[$schema->refName] = $responseSchema;
+            if (empty($schema->schema)) {
+                return $responseSchema;
+            }
+
+            foreach ($schema->schema as $field) {
+                if ($field->type === OpenApiEndpointParameterTypeEnum::TYPE_ARRAY) {
+                    $responseSchema[$field->name] = [
+                        'type'  => "array",
+                        'items' => $this->getEndpointResponseSchema($field->children)
+                    ];
+                } elseif ($field->type === OpenApiEndpointParameterTypeEnum::TYPE_OBJECT) {
+                    $responseSchema[$field->name] = [
+                        'type'       => "object",
+                        'properties' => $this->getEndpointResponseSchema($field->children)
+                    ];
+                } else {
+                    $responseSchema[$field->name] = $this->getEndpointParameterSchema($field);
+                }
+            }
+
+            $this->schemas[$schema->refName] = $responseSchema;
+        }
 
         return [
-            '$ref' => "#/components/schemas/{$schema->refName}"
+            '$ref' => "#/components/schemas/$schema->refName"
         ];
     }
 
