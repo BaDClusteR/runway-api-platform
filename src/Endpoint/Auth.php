@@ -31,6 +31,7 @@ class Auth {
      */
     #[API\Endpoint(path: "auth", method: "POST", public: true)]
     #[Docs\Endpoint("Authenticate user")]
+    #[Docs\Throws(code: 401, description: "Invalid credentials")]
     public function authenticate(
         #[API\Parameter(source: "body")]
         #[Assert\NotEmpty]
