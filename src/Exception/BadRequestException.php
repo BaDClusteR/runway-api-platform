@@ -8,9 +8,9 @@ use Throwable;
 
 class BadRequestException extends ApiException {
     public function __construct(
-        array      $errors,
-        ?Throwable $previous = null
+        array|string $errors,
+        ?Throwable   $previous = null
     ) {
-        parent::__construct($errors, 400, $previous);
+        parent::__construct((array)$errors, 400, $previous);
     }
 }
