@@ -6,9 +6,11 @@ namespace ApiPlatform\OpenAPI\Provider;
 
 use ApiPlatform\Attribute\Docs\Endpoint;
 use ApiPlatform\Attribute\Docs\Group;
+use ApiPlatform\Attribute\Docs\Throws;
 use ApiPlatform\DTO\ApiEndpointDTO;
 use ApiPlatform\Exception\InternalErrorException;
 use ApiPlatform\OpenAPI\DTO\OpenApiEndpointInfoDTO;
+use ApiPlatform\OpenAPI\DTO\OpenApiEndpointThrowsDTO;
 use ApiPlatform\OpenAPI\Provider\Arguments\IOpenApiEndpointArgumentInfoProvider;
 use ApiPlatform\OpenAPI\Provider\Response\IOpenApiEndpointResponseSchemaProvider;
 use ReflectionClass;
@@ -39,8 +41,27 @@ class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
             arguments: $this->getArguments($methodReflection, $endpoint),
             isPublic: $endpoint->isPublic,
             responseSchema: $this->responseSchemaProvider->getEndpointResponseSchema($endpoint),
-            isDeprecated: false
+            isDeprecated: false,
+            throws: $this->getEndpointThrows($methodReflection)
         );
+    }
+
+    /**
+     * @return OpenApiEndpointThrowsDTO[]
+     */
+    protected function getEndpointThrows(ReflectionMethod $method): array {
+        $result = [];
+
+        foreach ($method->getAttributes(Throws::class) as $attribute) {
+            /** @var Throws $instance */
+            $instance = $attribute->newInstance();
+            $result[] = new OpenApiEndpointThrowsDTO(
+                code: $instance->code,
+                description: $instance->description,
+            );
+        }
+
+        return $result;
     }
 
     protected function getGroupByClassReflection(ReflectionClass $classReflection): string {

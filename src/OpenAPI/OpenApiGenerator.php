@@ -59,7 +59,7 @@ class OpenApiGenerator implements IOpenApiGenerator {
         return [
             'Token' => [
                 'type'        => 'apiKey',
-                'description' => "Value for the {$this->tokenHeader} header parameter.",
+                'description' => "Value for the $this->tokenHeader header parameter.",
                 'name'        => $this->tokenHeader,
                 'in'          => "header"
             ]
@@ -226,11 +226,22 @@ class OpenApiGenerator implements IOpenApiGenerator {
      * @throws InternalErrorException
      */
     protected function getEndpointResponses(OpenApiEndpointInfoDTO $endpointInfo): array {
-        return [
+        $responses = [
             $this->getSuccessfulResponseCode($endpointInfo) => $this->getSuccessfulResponse($endpointInfo),
-            '401'                                           => $this->getUnauthorizedResponse(),
             '500'                                           => $this->getInternalErrorResponse()
         ];
+
+        if (!$endpointInfo->isPublic) {
+            $responses['401'] = $this->getUnauthorizedResponse();
+        }
+
+        foreach ($endpointInfo->throws as $throw) {
+            $responses[(string)$throw->code] = $this->getErrorResponse($throw->description);
+        }
+
+        ksort($responses);
+
+        return $responses;
     }
 
     protected function getSuccessfulResponseCode(OpenApiEndpointInfoDTO $endpointInfo): string {
@@ -243,7 +254,14 @@ class OpenApiGenerator implements IOpenApiGenerator {
      * @throws InternalErrorException
      */
     protected function getSuccessfulResponse(OpenApiEndpointInfoDTO $endpointInfo): array {
-        return $this->getEndpointResponseSchema($endpointInfo->responseSchema);
+        return [
+            'description' => $endpointInfo->responseSchema->description,
+            'content'     => [
+                'application/json' => [
+                    'schema' => $this->getEndpointResponseSchema($endpointInfo->responseSchema)
+                ]
+            ]
+        ];
     }
 
     protected function isApiResponseEmpty(OpenApiEndpointInfoDTO $endpointInfo): bool {

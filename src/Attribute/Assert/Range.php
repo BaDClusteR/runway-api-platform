@@ -17,7 +17,7 @@ class Range extends AAssertion {
 
     public function assert(ApiEndpointMethodParameterDTO $parameter): ApiParameterValidationResultDTO {
         if (!is_numeric($parameter->value)) {
-            $this->addError("{$parameter->name} should be a number.");
+            $this->addError("$parameter->name should be a number.");
         } else {
             $value = (int)$parameter->value;
 
