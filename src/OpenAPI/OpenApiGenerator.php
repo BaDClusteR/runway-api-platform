@@ -99,7 +99,7 @@ class OpenApiGenerator implements IOpenApiGenerator {
 
             $endpointPath = $this->endpointPrefix . $endpoint->path;
             $this->paths[$endpointPath] = [
-                ...($paths[$endpointPath] ?? []),
+                ...($this->paths[$endpointPath] ?? []),
                 ...$this->getEndpointPathInfo($endpoint, $endpointInfo)
             ];
         }
