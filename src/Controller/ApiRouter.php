@@ -85,7 +85,8 @@ class ApiRouter implements IApiRouter {
             subSection: $subSection,
             identifier: $identifier,
             method: $this->request->getMethod(),
-            body: $body
+            body: $body,
+            files: $this->request->getFiles()
         );
     }
 

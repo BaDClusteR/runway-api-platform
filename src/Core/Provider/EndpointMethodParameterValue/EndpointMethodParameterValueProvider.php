@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\Provider\EndpointMethodParameterValue;
 
+use ApiPlatform\DTO\ApiEndpointArgumentFileDTO;
 use ApiPlatform\DTO\ApiMethodParameterDTO;
 use ApiPlatform\DTO\ApiRequestDTO;
+use ApiPlatform\Exception\BadRequestException;
 use ApiPlatform\Exception\InternalErrorException;
 use ApiPlatform\Exception\RequiredParameterNotProvidedException;
 use Runway\Request\IRequest;
@@ -18,12 +20,14 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
     /**
      * @throws RequiredParameterNotProvidedException
      * @throws InternalErrorException
+     * @throws BadRequestException
      */
     public function getEndpointMethodParameterValue(ApiMethodParameterDTO $parameter, ApiRequestDTO $request): mixed {
         return match (strtolower($parameter->source)) {
             "query" => $this->getQueryParameterValue($parameter),
             "body"  => $this->getBodyParameterValue($parameter, $request),
             "path"  => $this->getPathParameterValue($parameter, $request),
+            "file"  => $this->getFile($parameter, $request),
             default => throw new InternalErrorException(
                 "Argument '{$parameter->argumentName}' has invalid source: '{$parameter->source}'. Allowed sources are GET, POST and PATH."
             ),
@@ -78,5 +82,64 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
         }
 
         return $value;
+    }
+
+    /**
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     */
+    protected function getFile(ApiMethodParameterDTO $parameter, ApiRequestDTO $request): ApiEndpointArgumentFileDTO {
+        if (isset($request->files[$parameter->name])) {
+            $file = $request->files[$parameter->name];
+
+            $uploadError = (int)($file['error'] ?? UPLOAD_ERR_OK);
+
+            if ($uploadError !== UPLOAD_ERR_OK) {
+                $this->throwFileRelatedException($parameter->name, $uploadError);
+            }
+
+            return new ApiEndpointArgumentFileDTO(
+                name: (string)($file['name'] ?? ''),
+                mimeType: (string)($file['type'] ?? ''),
+                tmpName: (string)($file['tmp_name'] ?? ''),
+                size: (int)($file['size'] ?? 0),
+            );
+        }
+
+        throw new BadRequestException(
+            ["Required file '$parameter->name' is not found in the request"]
+        );
+    }
+
+    /**
+     * @throws BadRequestException
+     * @throws InternalErrorException
+     */
+    protected function throwFileRelatedException(string $parameterName, int $errorCode): never {
+        switch ($errorCode) {
+            case UPLOAD_ERR_INI_SIZE: throw new BadRequestException(
+                ["File '$parameterName': file size exceeds the maximum upload size"]
+            );
+            case UPLOAD_ERR_FORM_SIZE: throw new BadRequestException(
+                ["File '$parameterName': file size exceeds the maximum upload size that was specified in the HTML form"]
+            );
+            case UPLOAD_ERR_PARTIAL: throw new BadRequestException(
+                ["File '$parameterName': file was only partially uploaded"]
+            );
+            case UPLOAD_ERR_NO_FILE: throw new InternalErrorException(
+                "There is no file '$parameterName' uploaded."
+            );
+            case UPLOAD_ERR_NO_TMP_DIR: throw new InternalErrorException(
+                "Cannot upload file '$parameterName': missing a temporary folder"
+            );
+            case UPLOAD_ERR_CANT_WRITE: throw new InternalErrorException(
+                "Cannot upload file '$parameterName': unable to write the file to the disk"
+            );
+            case UPLOAD_ERR_EXTENSION: throw new InternalErrorException(
+                "Cannot upload file '$parameterName': upload stopped by PHP extension"
+            );
+        }
+
+        throw new InternalErrorException("Cannot upload file '$parameterName': unknown error");
     }
 }

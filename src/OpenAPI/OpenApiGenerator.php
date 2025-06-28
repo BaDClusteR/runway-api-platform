@@ -158,7 +158,7 @@ class OpenApiGenerator implements IOpenApiGenerator {
         if ($bodyParameters = $this->getEndpointBodyParameters($endpointInfo)) {
             $result['requestBody'] = [
                 'content' => [
-                    'application/json' => [
+                    $endpointInfo->responseMimeType => [
                         'schema' => [
                             'type'       => "object",
                             'properties' => $bodyParameters
@@ -217,7 +217,11 @@ class OpenApiGenerator implements IOpenApiGenerator {
         return array_values(
             array_filter(
                 $endpointInfo->arguments,
-                static fn(OpenApiEndpointRequestParameterDTO $parameter): bool => $parameter->source === "body"
+                static fn(OpenApiEndpointRequestParameterDTO $parameter): bool => in_array(
+                    $parameter->source,
+                    ["body", "file"],
+                    true
+                )
             )
         );
     }
@@ -329,7 +333,7 @@ class OpenApiGenerator implements IOpenApiGenerator {
         OpenApiEndpointResponseParameterDTO|OpenApiEndpointRequestParameterDTO $parameter
     ): array {
         $result = [
-            'type'     => $parameter->type,
+            'type'     => $this->getEndpointParameterType($parameter),
             'nullable' => $parameter->isNullable
         ];
 
@@ -337,6 +341,10 @@ class OpenApiGenerator implements IOpenApiGenerator {
             if (!empty($parameter->{$field})) {
                 $result[$field] = $parameter->{$field};
             }
+        }
+
+        if (($parameter?->source ?? null) === "file") {
+            $result['format'] = "binary";
         }
 
         foreach (
@@ -353,6 +361,14 @@ class OpenApiGenerator implements IOpenApiGenerator {
         }
 
         return $result;
+    }
+
+    protected function getEndpointParameterType(
+        OpenApiEndpointResponseParameterDTO|OpenApiEndpointRequestParameterDTO $parameter
+    ): OpenApiEndpointParameterTypeEnum {
+        return ($parameter?->source ?? null) === "file"
+            ? OpenApiEndpointParameterTypeEnum::TYPE_STRING
+            : $parameter->type;
     }
 
     protected function getUnauthorizedResponse(): array {

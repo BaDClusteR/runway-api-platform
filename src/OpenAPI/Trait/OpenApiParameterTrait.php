@@ -7,6 +7,7 @@ use ApiPlatform\Attribute\Assert\NotEmpty;
 use ApiPlatform\Attribute\Assert\Range;
 use ApiPlatform\Attribute\Docs\Argument;
 use ApiPlatform\Attribute\Docs\Property;
+use ApiPlatform\DTO\ApiEndpointArgumentFileDTO;
 use ApiPlatform\OpenAPI\Enum\OpenApiEndpointParameterTypeEnum;
 use ReflectionClass;
 use ReflectionException;
@@ -20,7 +21,7 @@ trait OpenApiParameterTrait {
         return match (strtolower($reflection->getType()?->getName())) {
             "int"    => OpenApiEndpointParameterTypeEnum::TYPE_INTEGER,
             "float"  => OpenApiEndpointParameterTypeEnum::TYPE_NUMBER,
-            "string" => OpenApiEndpointParameterTypeEnum::TYPE_STRING,
+            "string", ApiEndpointArgumentFileDTO::class => OpenApiEndpointParameterTypeEnum::TYPE_STRING,
             "bool"   => OpenApiEndpointParameterTypeEnum::TYPE_BOOLEAN,
             "array"  => OpenApiEndpointParameterTypeEnum::TYPE_ARRAY,
             default  => OpenApiEndpointParameterTypeEnum::TYPE_OBJECT
@@ -30,7 +31,9 @@ trait OpenApiParameterTrait {
     protected function getParameterFormat(
         Argument|Property|null $infoAttribute
     ): string {
-        return (string)$infoAttribute?->format;
+        return ($infoAttribute?->source ?? null) === "file"
+            ? "binary"
+            : (string)$infoAttribute?->format;
     }
 
     protected function getParameterEnum(

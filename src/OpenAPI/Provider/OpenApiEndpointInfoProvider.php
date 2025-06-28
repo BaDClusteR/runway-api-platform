@@ -8,8 +8,10 @@ use ApiPlatform\Attribute\Docs\Endpoint;
 use ApiPlatform\Attribute\Docs\Group;
 use ApiPlatform\Attribute\Docs\Throws;
 use ApiPlatform\DTO\ApiEndpointDTO;
+use ApiPlatform\DTO\ApiEndpointArgumentFileDTO;
 use ApiPlatform\Exception\InternalErrorException;
 use ApiPlatform\OpenAPI\DTO\OpenApiEndpointInfoDTO;
+use ApiPlatform\OpenAPI\DTO\OpenApiEndpointRequestParameterDTO;
 use ApiPlatform\OpenAPI\DTO\OpenApiEndpointThrowsDTO;
 use ApiPlatform\OpenAPI\Provider\Arguments\IOpenApiEndpointArgumentInfoProvider;
 use ApiPlatform\OpenAPI\Provider\Response\IOpenApiEndpointResponseSchemaProvider;
@@ -42,7 +44,8 @@ class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
             isPublic: $endpoint->isPublic,
             responseSchema: $this->responseSchemaProvider->getEndpointResponseSchema($endpoint),
             isDeprecated: false,
-            throws: $this->getEndpointThrows($methodReflection)
+            throws: $this->getEndpointThrows($methodReflection),
+            responseMimeType: $this->getResponseMimeType($methodReflection),
         );
     }
 
@@ -84,6 +87,8 @@ class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
     }
 
     /**
+     * @return OpenApiEndpointRequestParameterDTO[]
+     *
      * @throws InternalErrorException
      * @throws ReflectionException
      */
@@ -95,5 +100,19 @@ class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
             ),
             $methodReflection->getParameters()
         );
+    }
+
+    protected function getResponseMimeType(ReflectionMethod $methodReflection): string {
+        if (
+            array_any(
+                $methodReflection->getParameters(),
+                static fn(ReflectionParameter $parameter) =>
+                    $parameter->getType()?->getName() === ApiEndpointArgumentFileDTO::class
+            )
+        ) {
+            return "multipart/form-data";
+        }
+
+        return "application/json";
     }
 }
