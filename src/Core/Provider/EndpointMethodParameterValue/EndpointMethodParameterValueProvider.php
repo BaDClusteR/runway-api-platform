@@ -92,17 +92,17 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
         if (isset($request->files[$parameter->name])) {
             $file = $request->files[$parameter->name];
 
-            $uploadError = (int)($file['error'] ?? UPLOAD_ERR_OK);
+            $uploadError = (int)$file->getError();
 
             if ($uploadError !== UPLOAD_ERR_OK) {
                 $this->throwFileRelatedException($parameter->name, $uploadError);
             }
 
             return new ApiEndpointArgumentFileDTO(
-                name: (string)($file['name'] ?? ''),
-                mimeType: (string)($file['type'] ?? ''),
-                tmpName: (string)($file['tmp_name'] ?? ''),
-                size: (int)($file['size'] ?? 0),
+                name: $file->getName(),
+                mimeType: $file->getType(),
+                tmpName: $file->getTmpName(),
+                size: $file->getSize(),
             );
         }
 

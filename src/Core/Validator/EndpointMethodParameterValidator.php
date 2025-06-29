@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\Validator;
 
+use ApiPlatform\DTO\ApiEndpointArgumentFileDTO;
 use ApiPlatform\DTO\ApiEndpointMethodParameterDTO;
 use ApiPlatform\DTO\ApiEndpointMethodParameterValidationResultDTO;
 use ApiPlatform\Exception\InternalErrorException;
@@ -85,7 +86,8 @@ class EndpointMethodParameterValidator implements IEndpointMethodParameterValida
         return [
             ...$this->getNumericParameterTypes(),
             ...$this->getStringParameterTypes(),
-            ...$this->getArrayParameterTypes()
+            ...$this->getArrayParameterTypes(),
+            ApiEndpointArgumentFileDTO::class
         ];
     }
 
