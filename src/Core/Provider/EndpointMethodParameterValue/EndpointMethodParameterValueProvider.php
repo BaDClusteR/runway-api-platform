@@ -38,7 +38,11 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
      * @throws RequiredParameterNotProvidedException
      */
     protected function getQueryParameterValue(ApiMethodParameterDTO $parameter): mixed {
-        if (!$this->request->hasGetParameter($parameter->name)) {
+        $hasParameter = $this->request->getMethod() === "GET"
+            ? $this->request->hasGetParameter($parameter->name)
+            : $this->request->hasPostParameter($parameter->name);
+
+        if (!$hasParameter) {
             if ($parameter->hasDefaultValue) {
                 return $parameter->defaultValue;
             }
@@ -46,7 +50,9 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
             throw new RequiredParameterNotProvidedException($parameter->name);
         }
 
-        return $this->request->getGetParameter($parameter->name)->asRaw();
+        return $this->request->getMethod() === "GET"
+            ? $this->request->getGetParameter($parameter->name)->asRaw()
+            : $this->request->getPostParameter($parameter->name)->asRaw();
     }
 
     /**
