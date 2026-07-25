@@ -11,7 +11,7 @@ use Runway\Request\IRequest;
 use Runway\Request\IResponse;
 use JsonException;
 
-class APIResponseController implements IApiResponseController {
+class ApiResponseController implements IApiResponseController {
     public function __construct(
         protected IEnvVariablesProvider $envVariablesProvider,
         protected IResponse             $response,

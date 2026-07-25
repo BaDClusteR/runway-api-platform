@@ -25,9 +25,6 @@ services:
   ApiPlatform\Core\Validator\IEndpointMethodParameterValidator:
     class: ApiPlatform\Core\Validator\EndpointMethodParameterValidator
 
-  ApiPlatform\Core\Provider\EndpointMethodParameterValue\IEndpointMethodParameterValidator:
-    class: ApiPlatform\Core\Provider\EndpointMethodParameterValue\EndpointMethodParameterValidator
-
   ApiPlatform\Core\Provider\EndpointMethodParameterValue\IEndpointMethodParameterValueProvider:
     class: ApiPlatform\Core\Provider\EndpointMethodParameterValue\EndpointMethodParameterValueProvider
 

@@ -12,7 +12,7 @@ use Runway\Request\Response;
 use Runway\Singleton\IKernel;
 use Throwable;
 
-class APIExceptionResponseController implements IApiExceptionResponseController {
+class ApiExceptionResponseController implements IApiExceptionResponseController {
     public function __construct(
         protected IApiResponseController $apiResponseController,
         protected ILogger                $logger,
