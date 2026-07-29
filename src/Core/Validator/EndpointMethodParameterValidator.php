@@ -84,6 +84,7 @@ class EndpointMethodParameterValidator implements IEndpointMethodParameterValida
      */
     protected function getAllowedParameterTypes(): array {
         return [
+            "bool",
             ...$this->getNumericParameterTypes(),
             ...$this->getStringParameterTypes(),
             ...$this->getArrayParameterTypes(),

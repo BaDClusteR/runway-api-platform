@@ -22,7 +22,7 @@ class Schema {
     /**
      * @throws JsonException
      */
-    #[API\Endpoint(path: "schema", method: "GET")]
+    #[API\Endpoint(path: "schema", method: "GET", public: true)]
     public function generateOpenApiSchema(): never {
         $this->kernel->processResponse(
             $this->getResponse()

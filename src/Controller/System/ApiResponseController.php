@@ -76,7 +76,7 @@ class ApiResponseController implements IApiResponseController {
         try {
             return json_encode(
                 $responseData,
-                JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT
+                JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
             );
         } catch (JsonException $e) {
             $this->logger->error(
