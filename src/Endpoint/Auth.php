@@ -4,101 +4,118 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Endpoint;
 
-use ApiPlatform\Attribute as API;
+use ApiPlatform\Attribute as Api;
 use ApiPlatform\Attribute\Assert;
 use ApiPlatform\Attribute\Docs;
 use ApiPlatform\Core\Singleton\IAuth;
+use ApiPlatform\Core\Storage\ISessionCookie;
 use ApiPlatform\Core\Storage\ITokenStorage;
-use ApiPlatform\Endpoint\DTO\Auth\AuthenticateDTO;
-use ApiPlatform\Endpoint\DTO\Auth\LogoffDTO;
+use ApiPlatform\Endpoint\DTO\Auth\DoneDTO;
+use ApiPlatform\Endpoint\DTO\Auth\LoginDTO;
+use ApiPlatform\Endpoint\DTO\Auth\StatusDTO;
 use ApiPlatform\Exception\ApiException;
 use ApiPlatform\Exception\AuthFailedException;
-use ApiPlatform\Exception\InternalErrorException;
-use ApiPlatform\Model\Token;
-use Runway\DataStorage\Exception\DBException;
-use Runway\DataStorage\QueryBuilder\Exception\QueryBuilderException;
-use Runway\Model\Exception\ModelException;
+use ApiPlatform\Exception\AuthorizationRequiredException;
+use ApiPlatform\Exception\TooManyRequestsException;
+use Runway\Request\IRequest;
 
-#[Docs\Group("Authorization")]
+/**
+ * The login of the only user (see IAuth): a browser gets the session in the cookie, a script - the token for the
+ * token header.
+ */
+#[Docs\Group('Authorization')]
+#[Api\Prefix('auth')]
 class Auth {
     public function __construct(
-        protected IAuth         $auth,
-        protected ITokenStorage $tokenStorage
+        protected IAuth          $auth,
+        protected ITokenStorage  $tokenStorage,
+        protected ISessionCookie $sessionCookie,
+        protected IRequest       $request
     ) {}
 
+    #[Api\Get('status', public: true)]
+    #[Docs\Endpoint('Whether the client is logged in')]
+    public function status(): StatusDTO {
+        return new StatusDTO(
+            isEnabled: $this->auth->isEnabled(),
+            isAuthenticated: !$this->auth->isEnabled() || $this->auth->isAuthenticated($this->tokenStorage->getToken())
+        );
+    }
+
     /**
-     * @throws InternalErrorException
-     * @throws AuthFailedException
+     * For the web server: e.g. nginx "auth_request" serves the files only to the logged-in clients.
+     *
+     * @throws AuthorizationRequiredException
      */
-    #[API\Post("auth", public: true)]
-    #[Docs\Endpoint("Authenticate user")]
-    #[Docs\Throws(code: 401, description: "Invalid credentials")]
-    public function authenticate(
-        #[API\Body]
-        #[Assert\NotEmpty]
-        #[Docs\Argument(example: "myLogin", description: "User login")]
-        string $login,
-
-        #[API\Body]
-        #[Docs\Argument(format: "password", example: "myPassword", description: "User password")]
-        #[Assert\NotEmpty]
-        string $password
-    ): AuthenticateDTO {
-        $this->checkEnabled();
-        $this->deactivateActiveToken();
-
-        if ($this->auth->isCredentialsCorrect($login, $password)) {
-            $tokenEntity = $this->auth->generateToken();
-
-            return new AuthenticateDTO(
-                token: $tokenEntity->getToken(),
-                valid_until: $tokenEntity->getValidUntil()->format(DATE_ATOM)
-            );
+    #[Api\Get('check', public: true)]
+    #[Docs\Endpoint('204 if the client is logged in (or the authorization is disabled), 401 otherwise')]
+    #[Docs\Throws(code: 401, description: 'Not logged in')]
+    public function check(): DoneDTO {
+        if ($this->auth->isEnabled() && !$this->auth->isAuthenticated($this->tokenStorage->getToken())) {
+            throw new AuthorizationRequiredException();
         }
 
-        throw new AuthFailedException();
+        return new DoneDTO();
     }
 
     /**
-     * @throws InternalErrorException
+     * @throws ApiException
+     * @throws AuthFailedException
+     * @throws TooManyRequestsException
      */
-    #[API\Get("logoff")]
-    #[Docs\Endpoint("Log off")]
-    public function logoff(): LogoffDTO {
+    #[Api\Post('login', public: true)]
+    #[Docs\Endpoint('Log in')]
+    #[Docs\Throws(code: 401, description: 'Invalid credentials')]
+    #[Docs\Throws(code: 404, description: 'The authorization is disabled')]
+    #[Docs\Throws(code: 429, description: 'Too many failed logins: try again later')]
+    public function login(
+        #[Api\Body]
+        #[Assert\NotEmpty]
+        #[Docs\Argument(example: 'myLogin')]
+        string $login,
+        #[Api\Body]
+        #[Assert\NotEmpty]
+        #[Docs\Argument(format: 'password', example: 'myPassword')]
+        string $password,
+        #[Api\Body]
+        #[Docs\Argument(description: 'Set the session cookie (a browser), otherwise the token is returned (a script)')]
+        bool   $useCookie = true
+    ): LoginDTO {
         $this->checkEnabled();
-        $this->deactivateActiveToken();
 
-        return new LogoffDTO();
+        // A new login ends the current session of the client.
+        $this->auth->logOut($this->tokenStorage->getToken());
+
+        $session = $this->auth->logIn($login, $password, $this->request->getIpAddress(), $this->request->getUserAgent())
+            ?? throw new AuthFailedException();
+
+        if ($useCookie) {
+            $this->sessionCookie->set($session->token, $session->validUntil);
+        }
+
+        return new LoginDTO($useCookie ? null : $session->token, date(DATE_ATOM, $session->validUntil));
+    }
+
+    #[Api\Post('logout', public: true)]
+    #[Docs\Endpoint('Log out: the session ends')]
+    public function logout(): DoneDTO {
+        $this->auth->logOut($this->tokenStorage->getToken());
+
+        if ($this->tokenStorage->isCookieToken()) {
+            $this->sessionCookie->delete();
+        }
+
+        return new DoneDTO();
     }
 
     /**
-     * Without the authorization (API_AUTH_ENABLED=false) there are no credentials nor tokens.
+     * Without the authorization (API_AUTH_ENABLED=false) there are no credentials nor sessions.
      *
      * @throws ApiException
      */
     protected function checkEnabled(): void {
         if (!$this->auth->isEnabled()) {
-            throw new ApiException(["The authorization is disabled."], 404);
-        }
-    }
-
-    /**
-     * @throws InternalErrorException
-     */
-    protected function deactivateActiveToken(): void {
-        $token = $this->tokenStorage->getToken();
-
-        if ($this->auth->isAuthenticated($token)) {
-            try {
-                /** @var Token|null $tokenModel */
-                $tokenModel = Token::findOne([
-                    'token' => $token
-                ]);
-
-                $tokenModel?->setActive(false)?->persist();
-            } catch (DBException|QueryBuilderException|ModelException $e) {
-                throw new InternalErrorException($e->getMessage(), $e);
-            }
+            throw new ApiException(['The authorization is disabled.'], 404);
         }
     }
 }

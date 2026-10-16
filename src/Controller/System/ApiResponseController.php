@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Controller\System;
 
+use ApiPlatform\Core\Storage\ISessionCookie;
 use ApiPlatform\DTO\ApiResponseDTO;
 use Runway\Env\Provider\IEnvVariablesProvider;
 use Runway\Logger\ILogger;
@@ -16,7 +17,8 @@ class ApiResponseController implements IApiResponseController {
         protected IEnvVariablesProvider $envVariablesProvider,
         protected IResponse             $response,
         protected ILogger               $logger,
-        protected IRequest              $request
+        protected IRequest              $request,
+        protected ISessionCookie        $sessionCookie
     ) {}
 
     public function getResponse(ApiResponseDTO $response): IResponse {
@@ -98,6 +100,13 @@ class ApiResponseController implements IApiResponseController {
     protected function initResponse(): IResponse {
         $this->addCORSHeaders();
         $this->setContentTypeHeader();
+
+        // E.g. a login sets the session cookie, a logout deletes it.
+        $cookie = $this->sessionCookie->takeChange();
+
+        if ($cookie !== null) {
+            $this->response->addCookie($cookie);
+        }
 
         return $this->response;
     }

@@ -28,15 +28,9 @@ class Api implements IApi {
     ) {}
 
     public function execute(ApiEndpointDTO $endpoint, ApiRequestDTO $request): ApiResponseDTO {
+        // The session activity is updated by the check.
         if (!$this->isEndpointAccessible($endpoint)) {
             throw new AuthorizationRequiredException();
-        }
-
-        $token = $this->tokenStorage->getToken();
-
-        // E.g. a public endpoint called without a token. Without the authorization there are no tokens at all.
-        if ($token !== '' && $this->auth->isEnabled()) {
-            $this->auth->updateTokenLastActiveDate($token);
         }
 
         $parameters = $this->parametersProvider->getEndpointMethodParameters($endpoint, $request);

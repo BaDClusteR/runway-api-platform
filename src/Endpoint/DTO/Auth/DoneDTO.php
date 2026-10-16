@@ -6,6 +6,9 @@ namespace ApiPlatform\Endpoint\DTO\Auth;
 
 use ApiPlatform\Attribute\Docs;
 
-#[Docs\Response("Client is logged off")]
-class LogoffDTO {
+/**
+ * No data: the response is "204 No Content".
+ */
+#[Docs\Response('Done')]
+readonly class DoneDTO {
 }

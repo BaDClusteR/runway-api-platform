@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace ApiPlatform\Tests\Unit;
 
 use ApiPlatform\Controller\System\ApiResponseController;
+use ApiPlatform\Core\Storage\SessionCookie;
 use ApiPlatform\DTO\ApiResponseDTO;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -27,7 +28,7 @@ class CorsTest extends TestCase {
         $request->method('getHeader')->willReturn($origin);
         $request->method('getRequestId')->willReturn('id');
 
-        $headers = new ApiResponseController($env, new Response(), $this->createStub(ILogger::class), $request)
+        $headers = new ApiResponseController($env, new Response(), $this->createStub(ILogger::class), $request, new SessionCookie($request))
             ->getResponse(new ApiResponseDTO(['ok' => true]))
             ->getHeaders();
 

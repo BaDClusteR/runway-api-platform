@@ -53,16 +53,34 @@ The endpoints are the routes of the Runway router, so the router rules apply:
 The mistakes (a placeholder without an argument, an argument without a source, etc.) are reported when the endpoints
 are collected, not when the endpoint is called.
 
+## Authorization
+
+One user: its login and password hash (Argon2id) are in the `options` table, set them with `IAuth::setCredentials()`
+(e.g. by a console command of the project), it ends all the sessions.
+
+- `POST auth/login` starts a session: a browser gets it in the cookie (`HttpOnly`, `SameSite=Strict`, `Secure` over
+  HTTPS), a script (`useCookie: false`) gets the token for the `API_TOKEN_HEADER` header. Only the hash of the token
+  is stored (the `tokens` table). A session lasts 30 days.
+- `POST auth/logout` ends it, `GET auth/status` tells whether the client is logged in.
+- `GET auth/check` responds with 204 or 401: for the web server, e.g. nginx `auth_request` serves the static files only
+  to the logged-in clients.
+- The failed logins (the `login_attempts` table) are limited: 5 per IP address and 50 in total for 15 minutes, then
+  the response is 429.
+- A change (not `GET`, `HEAD` or `OPTIONS`) made with the session cookie by a page of another site is rejected (403).
+
+The tables (with the project prefix): `options (id, name, value)`, `tokens (id, token, generated, valid_until,
+last_active, ip, user_agent, server_info, expired, active)`, `login_attempts (id, ip, attempted)`.
+
 ## Configuration
 
 The ENV variables (see `.env`, override them in the project):
 
 - `API_AUTH_ENABLED`: `false` makes every endpoint public, e.g. when the access is limited by the web server (by IP,
-  basic auth, etc.). Then `API_CRYPTO_KEY`, `API_CRYPTO_KEY_LENGTH` and `API_AUTH_HASH` are not needed, and the
-  `auth` / `logoff` endpoints respond with 404.
+  basic auth, etc.). Then `auth/login` responds with 404.
+- `API_TOKEN_HEADER`: the header of the session token for the scripts, `X-Token` by default.
 - `API_ALLOW_ORIGIN`: comma-separated origins allowed to call the API from a browser on another site (CORS), `*` for
   any site. Empty by default: only the pages of the API site itself can call it.
-- `api_path_prefix` parameter: `/api` by default.
+- `api_path_prefix` parameter: `/api` by default; `api_session_cookie`: the session cookie, `api_session` by default.
 
 The errors of the API paths (including 404 and 405) are JSON. The details of the internal errors (the message, the
 file, the trace) are shown only with `APP_DEBUG=true`; the client errors (4xx) are logged at the info level, the

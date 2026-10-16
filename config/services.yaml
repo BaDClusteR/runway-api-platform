@@ -52,21 +52,20 @@ services:
     class: ApiPlatform\Core\Storage\TokenStorage
     arguments:
       tokenHeader: '#API_TOKEN_HEADER'
+      cookieName: '%api_session_cookie'
 
-  ApiPlatform\Core\ICrypto:
-    class: ApiPlatform\Core\Crypto
+  ApiPlatform\Core\Storage\ISessionCookie:
+    class: ApiPlatform\Core\Storage\SessionCookie
     arguments:
-      cipher: 'AES-256-CBC'
-      options: 1
-      hashAlgo: 'sha256'
-      sha2Length: 32
+      cookieName: '%api_session_cookie'
+
+  ApiPlatform\Core\Auth\IAuthStorage:
+    class: ApiPlatform\Core\Auth\AuthStorage
 
   ApiPlatform\Core\Singleton\IAuth:
     class: ApiPlatform\Core\Singleton\Auth
     arguments:
       enabled: '#API_AUTH_ENABLED'
-      key: '#API_CRYPTO_KEY'
-      keyLength: '#API_CRYPTO_KEY_LENGTH'
 
   response.json.successful:
     class: Runway\Request\Response

@@ -130,6 +130,34 @@ class ApiRequestTest extends TestCase {
         self::assertSame(401, $this->request('GET', '/api/chats/42/private')->getCode());
     }
 
+    /**
+     * A change with the session cookie from a page of another site (CSRF) is rejected, a request of a script (without
+     * the cookie) or of the site itself is not.
+     */
+    #[DataProvider('originProvider')]
+    public function testOrigin(?string $cookie, string $origin, int $expectedCode): void {
+        $_SERVER['HTTP_HOST'] = 'archive.example';
+        $_SERVER['HTTP_ORIGIN'] = $origin;
+        $_COOKIE = ($cookie !== null) ? ['api_session' => $cookie] : [];
+
+        try {
+            $response = $this->request('PATCH', '/api/chats/42/messages/7/meta', '{"meta": {"a": "b"}}');
+        } finally {
+            unset($_SERVER['HTTP_HOST'], $_SERVER['HTTP_ORIGIN']);
+            $_COOKIE = [];
+        }
+
+        self::assertSame($expectedCode, $response->getCode());
+    }
+
+    public static function originProvider(): array {
+        return [
+            'another site with the cookie' => ['token', 'https://evil.example', 403],
+            'the site itself'              => ['token', 'https://archive.example', 200],
+            'another site without cookie'  => [null, 'https://evil.example', 200],
+        ];
+    }
+
     protected function request(string $method, string $uri, string $body = ''): IResponseRead {
         $_SERVER['REQUEST_METHOD'] = $method;
         $_SERVER['REQUEST_URI'] = $uri;

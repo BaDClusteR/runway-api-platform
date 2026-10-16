@@ -7,6 +7,7 @@ namespace ApiPlatform\Controller;
 use ApiPlatform\Controller\System\IApiExceptionResponseController;
 use ApiPlatform\Controller\System\IApiResponseController;
 use ApiPlatform\Core\Provider\Endpoints\IEndpointsProvider;
+use ApiPlatform\Core\Storage\ITokenStorage;
 use ApiPlatform\DTO\ApiEndpointDTO;
 use ApiPlatform\DTO\ApiRequestDTO;
 use ApiPlatform\Exception\ApiException;
@@ -25,7 +26,8 @@ class ApiController implements IApiController {
         protected IEndpointsProvider              $endpointsProvider,
         protected IApiResponseController          $responseController,
         protected IApiExceptionResponseController $errorResponseController,
-        protected ILogger                         $logger
+        protected ILogger                         $logger,
+        protected ITokenStorage                   $tokenStorage
     ) {}
 
     public function handle(string ...$pathParameters): Response {
@@ -42,11 +44,39 @@ class ApiController implements IApiController {
                 ]
             );
 
+            $this->checkOrigin();
+
             return $this->responseController->getResponse(
                 $this->api->execute($endpoint, $this->getApiRequestDTO($pathParameters))
             );
         } catch (ApiException $e) {
             return $this->errorResponseController->getResponse($e);
+        }
+    }
+
+    /**
+     * The browser sends the session cookie with any request to the site: a change made by a page of another site (CSRF)
+     * is rejected. The cookie is SameSite=Strict anyway, this is the second line of defense.
+     *
+     * @throws ApiException
+     */
+    protected function checkOrigin(): void {
+        $origin = (string)$this->request->getHeader('Origin');
+
+        if (
+            $origin === ''
+            || in_array($this->request->getMethod(), ['GET', 'HEAD', 'OPTIONS'], true)
+            || !$this->tokenStorage->isCookieToken()
+        ) {
+            return;
+        }
+
+        $host = parse_url($origin, PHP_URL_HOST);
+        $port = parse_url($origin, PHP_URL_PORT);
+        $originAuthority = strtolower($host . (($port !== null) ? ":$port" : ''));
+
+        if ($originAuthority !== strtolower($this->request->getHost())) {
+            throw new ApiException(['The request is made by another site.'], 403);
         }
     }
 
