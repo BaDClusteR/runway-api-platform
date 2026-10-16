@@ -116,11 +116,12 @@ class EndpointsProvider implements IEndpointsProvider {
 
             foreach ($attributes as $index => $attribute) {
                 $endpoints[] = $this->buildEndpoint(
+                    $class,
                     $method,
                     $attribute->newInstance(),
                     $prefix,
                     // A method can have several endpoints (e.g. an old path and a new one).
-                    $this->getRouteName($method) . ($index ? ".$index" : '')
+                    $this->getRouteName($class, $method) . ($index ? ".$index" : '')
                 );
             }
         }
@@ -134,21 +135,22 @@ class EndpointsProvider implements IEndpointsProvider {
         return $attribute ? $attribute->newInstance()->path : '';
     }
 
-    protected function getRouteName(ReflectionMethod $method): string {
-        return "api.{$method->getDeclaringClass()->getName()}::{$method->getName()}";
+    protected function getRouteName(ReflectionClass $class, ReflectionMethod $method): string {
+        return "api.{$class->getName()}::{$method->getName()}";
     }
 
     /**
      * @throws EndpointDefinitionException
      */
     protected function buildEndpoint(
+        ReflectionClass  $class,
         ReflectionMethod $method,
         Endpoint         $attribute,
         string           $prefix,
         string           $routeName
     ): ApiEndpointDTO {
         $path = $this->joinPaths($prefix, $attribute->path);
-        $endpointName = "{$method->getDeclaringClass()->getName()}::{$method->getName()}()";
+        $endpointName = "{$class->getName()}::{$method->getName()}()";
         $placeholders = $this->getPlaceholders($path, $routeName, $endpointName);
 
         $parameters = [];
@@ -181,7 +183,7 @@ class EndpointsProvider implements IEndpointsProvider {
         return new ApiEndpointDTO(
             path: $path,
             requestMethod: strtoupper($attribute->method),
-            class: $method->getDeclaringClass()->getName(),
+            class: $class->getName(),
             method: $method->getName(),
             isPublic: $attribute->public,
             routeName: $routeName,

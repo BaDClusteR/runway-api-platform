@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 use Runway\Router\Compiler\RouteCompiler;
 
 require_once dirname(__DIR__) . '/Fixture/InvalidEndpoints.php';
+require_once dirname(__DIR__) . '/Fixture/FolderEndpoints.php';
 
 class EndpointsProviderTest extends TestCase {
     public function testPathsAreJoinedWithClassPrefix(): void {
@@ -75,6 +76,22 @@ class EndpointsProviderTest extends TestCase {
 
         self::assertSame($endpoint, $provider->getEndpointByRouteName($endpoint->routeName));
         self::assertNull($provider->getEndpointByRouteName('unknown'));
+    }
+
+    public function testInheritedEndpointsBelongToSubclass(): void {
+        $endpoints = new EndpointsProvider(
+            new RouteCompiler(),
+            [Fixture\ContactFolderEndpoints::class, Fixture\DocumentFolderEndpoints::class]
+        )->getApiEndpoints();
+
+        self::assertSame(
+            [
+                ['contact-folders/{folderId}/name', Fixture\ContactFolderEndpoints::class],
+                ['document-folders/{folderId}/name', Fixture\DocumentFolderEndpoints::class],
+            ],
+            array_map(static fn(ApiEndpointDTO $endpoint): array => [$endpoint->path, $endpoint->class], $endpoints)
+        );
+        self::assertNotSame($endpoints[0]->routeName, $endpoints[1]->routeName);
     }
 
     #[DataProvider('invalidEndpointProvider')]

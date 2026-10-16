@@ -101,6 +101,11 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
                 $this->throwFileRelatedException($parameter->name, $uploadError);
             }
 
+            // The endpoint can copy or move the file: it must be the uploaded one, not any file of the server.
+            if (!$this->isUploadedFile($file->getTmpName())) {
+                throw new BadRequestException(["File '$parameter->name' is not uploaded"]);
+            }
+
             return new ApiEndpointArgumentFileDTO(
                 name: $file->getName(),
                 mimeType: $file->getType(),
@@ -112,6 +117,10 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
         throw new BadRequestException(
             ["Required file '$parameter->name' is not found in the request"]
         );
+    }
+
+    protected function isUploadedFile(string $path): bool {
+        return is_uploaded_file($path);
     }
 
     /**
