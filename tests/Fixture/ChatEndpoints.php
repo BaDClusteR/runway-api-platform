@@ -62,6 +62,11 @@ class ChatEndpoints {
         return new ResultDTO(['chatId' => $chatId, 'pinned' => $pinned]);
     }
 
+    #[Api\Get('tree', public: true)]
+    public function tree(int $chatId): TreeDTO {
+        return new TreeDTO([['type' => 'folder', 'children' => []]]);
+    }
+
     #[Api\Get('private')]
     public function private(int $chatId): ResultDTO {
         return new ResultDTO(['chatId' => $chatId]);

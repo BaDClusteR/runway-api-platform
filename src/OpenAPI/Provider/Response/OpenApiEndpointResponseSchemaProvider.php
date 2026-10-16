@@ -131,9 +131,10 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
     }
 
     protected function isPrimitiveType(string $type): bool {
+        // "object" and "mixed" are free-form values: e.g. tree nodes of different kinds.
         return in_array(
             strtolower($type),
-            ['string', 'int', 'float', 'int', 'bool']
+            ['string', 'int', 'float', 'bool', 'object', 'mixed']
         );
     }
 

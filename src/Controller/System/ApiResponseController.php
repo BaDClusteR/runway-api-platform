@@ -21,6 +21,13 @@ class ApiResponseController implements IApiResponseController {
 
     public function getResponse(ApiResponseDTO $response): IResponse {
         $responseCode = $this->getResponseCode($response);
+        $body = $this->getResponseBody($response);
+
+        // The data cannot be encoded: an empty successful response would look like no data.
+        if ($body === null) {
+            $responseCode = 500;
+            $body = '{"errors": [{"code": 500, "message": "Internal server error"}]}';
+        }
 
         // Without the data: it can contain tokens and personal data.
         $this->logger->debug("API response", ['code' => $responseCode]);
@@ -30,9 +37,7 @@ class ApiResponseController implements IApiResponseController {
                     ->addHeaders(
                         $this->getResponseHeaders($response)
                     )
-                    ->setBody(
-                        $this->getResponseBody($response)
-                    );
+                    ->setBody($body);
     }
 
     protected function getResponseData(ApiResponseDTO $response): array {
@@ -61,16 +66,21 @@ class ApiResponseController implements IApiResponseController {
         ];
     }
 
-    protected function getResponseBody(ApiResponseDTO $response): string {
+    /**
+     * @return string|null Null if the data cannot be encoded.
+     */
+    protected function getResponseBody(ApiResponseDTO $response): ?string {
         $responseData = $this->getResponseData($response);
         if (!$responseData) {
             return "";
         }
 
         try {
+            // A broken UTF-8 sequence (e.g. in an old imported text) is replaced rather than fails the whole response.
             return json_encode(
                 $responseData,
-                JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+                JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                | JSON_INVALID_UTF8_SUBSTITUTE
             );
         } catch (JsonException $e) {
             $this->logger->error(
@@ -82,7 +92,7 @@ class ApiResponseController implements IApiResponseController {
             );
         }
 
-        return "";
+        return null;
     }
 
     protected function initResponse(): IResponse {

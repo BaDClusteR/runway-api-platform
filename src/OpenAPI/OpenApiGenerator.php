@@ -296,50 +296,36 @@ class OpenApiGenerator implements IOpenApiGenerator {
     /**
      * @throws InternalErrorException
      */
+    /**
+     * @param OpenApiEndpointResponseSchemaDTO|string $schema A DTO schema (it goes to the components), or a PHP type
+     *                                                        name of a primitive or a free-form value ("object",
+     *                                                        "mixed").
+     *
+     * @throws InternalErrorException
+     */
     protected function getEndpointResponseSchema(OpenApiEndpointResponseSchemaDTO|string $schema): array {
         if (is_string($schema)) {
-            return [
-                'type' => $schema
-            ];
+            return match (strtolower($schema)) {
+                'int'    => ['type' => 'integer'],
+                'float'  => ['type' => 'number'],
+                'bool'   => ['type' => 'boolean'],
+                // Any JSON value.
+                'mixed'  => [],
+                default  => ['type' => strtolower($schema)],
+            };
         }
 
-        if (empty($this->schemas[$schema->refName])) {
-            $responseSchema = [];
+        if (!isset($this->schemas[$schema->refName])) {
+            // Registered before the properties: a DTO can refer to itself (e.g. a tree node).
+            $this->schemas[$schema->refName] = [];
+            $responseSchema = ['type' => 'object'];
 
             if ($schema->description) {
                 $responseSchema['description'] = $schema->description;
             }
 
-            if (empty($schema->schema)) {
-                return $responseSchema;
-            }
-
             foreach ($schema->schema as $field) {
-                if ($field->type === OpenApiEndpointParameterTypeEnum::TYPE_ARRAY) {
-                    if (!$field->children) {
-                        throw new InternalErrorException(
-                            "Error while generating schema for '$schema->refName': field '$field->name' is array, but the items type is not defined."
-                        );
-                    }
-
-                    $responseSchema[$field->name] = [
-                        'type'  => "array",
-                        'items' => $this->getEndpointResponseSchema($field->children)
-                    ];
-                } elseif ($field->type === OpenApiEndpointParameterTypeEnum::TYPE_OBJECT) {
-                    if (!$field->children) {
-                        throw new InternalErrorException(
-                            "Error while generating schema for '$schema->refName': field '$field->name' is object, but its type is not defined."
-                        );
-                    }
-
-                    $responseSchema[$field->name] = [
-                        'type'       => "object",
-                        'properties' => $this->getEndpointResponseSchema($field->children)
-                    ];
-                } else {
-                    $responseSchema[$field->name] = $this->getEndpointParameterSchema($field);
-                }
+                $responseSchema['properties'][$field->name] = $this->getFieldSchema($schema, $field);
             }
 
             $this->schemas[$schema->refName] = $responseSchema;
@@ -348,6 +334,38 @@ class OpenApiGenerator implements IOpenApiGenerator {
         return [
             '$ref' => "#/components/schemas/$schema->refName"
         ];
+    }
+
+    /**
+     * @throws InternalErrorException
+     */
+    protected function getFieldSchema(
+        OpenApiEndpointResponseSchemaDTO    $schema,
+        OpenApiEndpointResponseParameterDTO $field
+    ): array {
+        if ($field->type === OpenApiEndpointParameterTypeEnum::TYPE_ARRAY) {
+            if (!$field->children) {
+                throw new InternalErrorException(
+                    "Error while generating schema for '$schema->refName': field '$field->name' is array, but the items type is not defined."
+                );
+            }
+
+            return [
+                'type'  => "array",
+                'items' => $this->getEndpointResponseSchema($field->children)
+            ];
+        }
+
+        if ($field->type === OpenApiEndpointParameterTypeEnum::TYPE_OBJECT) {
+            // A DTO, or a free-form object (e.g. "object" or stdClass type): any properties.
+            $fieldSchema = $this->getEndpointResponseSchema($field->children ?? 'object');
+
+            return $field->isNullable
+                ? ['nullable' => true, 'allOf' => [$fieldSchema]]
+                : $fieldSchema;
+        }
+
+        return $this->getEndpointParameterSchema($field);
     }
 
     protected function getEndpointParameterSchema(
