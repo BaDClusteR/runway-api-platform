@@ -34,8 +34,10 @@ class OpenApiEndpointArgumentInfoProvider implements IOpenApiEndpointArgumentInf
     ): OpenApiEndpointRequestParameterDTO {
         $argumentReflection = $this->getArgumentReflection($endpoint->class, $endpoint->method, $argumentName);
 
-        /** @var Parameter|null $argumentAttribute */
-        $argumentAttribute = $this->getFirstAttribute($argumentReflection, Parameter::class);
+        // The sources are defined when the endpoints are collected: e.g. a path placeholder has no attribute.
+        $parameter = $endpoint->parameters[$argumentName] ?? throw new InternalErrorException(
+            "Argument \$$argumentName of $endpoint->class::$endpoint->method() is not described."
+        );
 
         /** @var Argument|null $infoAttribute */
         $infoAttribute = $this->getFirstAttribute($argumentReflection, Argument::class);
@@ -44,12 +46,13 @@ class OpenApiEndpointArgumentInfoProvider implements IOpenApiEndpointArgumentInf
         [$minLength, $maxLength] = $this->getParameterLength($argumentReflection);
 
         return new OpenApiEndpointRequestParameterDTO(
-            name: $argumentAttribute->name ?? $argumentName,
+            name: $parameter->name,
             type: $this->getParameterType($argumentReflection),
-            source: $argumentAttribute->source,
-            isRequired: !$argumentReflection->isOptional(),
+            source: $parameter->source,
+            // The path parameters are always required in OpenAPI.
+            isRequired: $parameter->source === Parameter::SOURCE_PATH || !$argumentReflection->isOptional(),
             isNullable: $argumentReflection->allowsNull(),
-            description: $infoAttribute->description,
+            description: (string)$infoAttribute?->description,
             format: $this->getParameterFormat($infoAttribute),
             default: $this->getParameterDefaultValue($argumentReflection),
             example: $this->getParameterExample($infoAttribute),

@@ -11,17 +11,31 @@
     "php": ">=8.4",
     "ext-simplexml": "*",
     "ext-dom": "*",
+    "ext-mbstring": "*",
     "ext-zip": "*",
     "bad_cluster/runway": "dev-main"
   },
   "require-dev": {
-    "roave/security-advisories": "dev-latest"
+    "roave/security-advisories": "dev-latest",
+    "phpunit/phpunit": "^13.4"
   },
   "autoload": {
     "psr-4": {"ApiPlatform\\" : "src/"},
     "files": ["bootstrap.php"]
   },
   "autoload-dev": {
-    "psr-4": {"AplPlatform\\Tests\\": "tests/"}
+    "psr-4": {"ApiPlatform\\Tests\\": "tests/"}
+  },
+  "repositories": {
+    "runway": {
+      "type": "path",
+      "url": "../runway",
+      "options": {
+        "symlink": true,
+        "versions": {
+          "bad_cluster/runway": "dev-main"
+        }
+      }
+    }
   }
 }

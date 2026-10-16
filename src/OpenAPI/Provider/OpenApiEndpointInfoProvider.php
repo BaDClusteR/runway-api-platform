@@ -7,6 +7,7 @@ namespace ApiPlatform\OpenAPI\Provider;
 use ApiPlatform\Attribute\Docs\Endpoint;
 use ApiPlatform\Attribute\Docs\Group;
 use ApiPlatform\Attribute\Docs\Throws;
+use ApiPlatform\Core\Singleton\IAuth;
 use ApiPlatform\DTO\ApiEndpointDTO;
 use ApiPlatform\DTO\ApiEndpointArgumentFileDTO;
 use ApiPlatform\Exception\InternalErrorException;
@@ -23,7 +24,8 @@ use ReflectionParameter;
 class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
     public function __construct(
         protected IOpenApiEndpointArgumentInfoProvider   $argumentInfoProvider,
-        protected IOpenApiEndpointResponseSchemaProvider $responseSchemaProvider
+        protected IOpenApiEndpointResponseSchemaProvider $responseSchemaProvider,
+        protected IAuth                                  $auth
     ) {}
 
     /**
@@ -41,7 +43,8 @@ class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
             description: (string)($endpointAttribute?->description ?: $endpointAttribute?->title),
             operationId: (string)($endpointAttribute?->operationId ?: $endpointAttribute?->title),
             arguments: $this->getArguments($methodReflection, $endpoint),
-            isPublic: $endpoint->isPublic,
+            // Without the authorization every endpoint is public: no "401 Unauthorized".
+            isPublic: $endpoint->isPublic || !$this->auth->isEnabled(),
             responseSchema: $this->responseSchemaProvider->getEndpointResponseSchema($endpoint),
             isDeprecated: false,
             throws: $this->getEndpointThrows($methodReflection),
@@ -93,13 +96,19 @@ class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
      * @throws ReflectionException
      */
     protected function getArguments(ReflectionMethod $methodReflection, ApiEndpointDTO $endpoint): array {
-        return array_map(
+        // The arguments not taken from the request (they get their default values) are not a part of the API.
+        $requestParameters = array_filter(
+            $methodReflection->getParameters(),
+            static fn(ReflectionParameter $parameter): bool => ($endpoint->parameters[$parameter->getName()]->source ?? '') !== ''
+        );
+
+        return array_values(array_map(
             fn(ReflectionParameter $parameter) => $this->argumentInfoProvider->getEndpointArgumentInfo(
                 $endpoint,
                 $parameter->getName()
             ),
-            $methodReflection->getParameters()
-        );
+            $requestParameters
+        ));
     }
 
     protected function getResponseMimeType(ReflectionMethod $methodReflection): string {

@@ -19,7 +19,8 @@ class Range extends AAssertion {
         if (!is_numeric($parameter->value)) {
             $this->addError("$parameter->name should be a number.");
         } else {
-            $value = (int)$parameter->value;
+            // Not (int): 1.5 is not in the range [1, 1].
+            $value = +$parameter->value;
 
             if ($this->min !== null && $value < $this->min) {
                 $this->addError("{$parameter->name} should be {$this->min} or more, $value given.");

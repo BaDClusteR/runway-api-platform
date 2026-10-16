@@ -97,12 +97,21 @@ class OpenApiGenerator implements IOpenApiGenerator {
         foreach ($this->getApiEndpoints() as $endpoint) {
             $endpointInfo = $this->endpointInfoProvider->getEndpointInfo($endpoint);
 
-            $endpointPath = $this->endpointPrefix . $endpoint->path;
+            $endpointPath = $this->getOpenApiPath($endpoint);
             $this->paths[$endpointPath] = [
                 ...($this->paths[$endpointPath] ?? []),
                 ...$this->getEndpointPathInfo($endpoint, $endpointInfo)
             ];
         }
+    }
+
+    /**
+     * The endpoint path templates have the OpenAPI syntax, but without the inline requirements: "{year<\d{4}>}" is
+     * "{year}" (a requirement ends with ">}").
+     */
+    protected function getOpenApiPath(ApiEndpointDTO $endpoint): string {
+        return rtrim($this->endpointPrefix, '/') . '/'
+            . preg_replace('/\{(\w+)<.*?>}/', '{$1}', $endpoint->path);
     }
 
     /**
@@ -188,13 +197,25 @@ class OpenApiGenerator implements IOpenApiGenerator {
     protected function getEndpointParameters(OpenApiEndpointInfoDTO $endpointInfo): array {
         $parameters = [];
 
+        // A Parameter Object: the name, the location and the documentation, the type details are in the schema.
+        $parameterFields = ['description', 'example', 'required'];
+
         foreach ($this->getRequestParameters($endpointInfo) as $parameter) {
-            $parameters[$parameter->name] = [
-                ...$this->getEndpointParameterSchema(
-                    $parameter
-                ),
-                'in' => $parameter->source
-            ];
+            $schema = $this->getEndpointParameterSchema($parameter);
+            $result = ['name' => $parameter->name, 'in' => $parameter->source];
+
+            foreach ($parameterFields as $field) {
+                if (array_key_exists($field, $schema)) {
+                    $result[$field] = $schema[$field];
+                }
+            }
+
+            if ($parameter->source === 'query') {
+                $result['allowEmptyValue'] = $parameter->allowEmptyValue;
+            }
+
+            $result['schema'] = array_diff_key($schema, array_flip([...$parameterFields, 'allowEmptyValue']));
+            $parameters[] = $result;
         }
 
         return $parameters;

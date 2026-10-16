@@ -11,6 +11,7 @@ use ApiPlatform\Core\Singleton\IAuth;
 use ApiPlatform\Core\Storage\ITokenStorage;
 use ApiPlatform\Endpoint\DTO\Auth\AuthenticateDTO;
 use ApiPlatform\Endpoint\DTO\Auth\LogoffDTO;
+use ApiPlatform\Exception\ApiException;
 use ApiPlatform\Exception\AuthFailedException;
 use ApiPlatform\Exception\InternalErrorException;
 use ApiPlatform\Model\Token;
@@ -29,20 +30,21 @@ class Auth {
      * @throws InternalErrorException
      * @throws AuthFailedException
      */
-    #[API\Endpoint(path: "auth", method: "POST", public: true)]
+    #[API\Post("auth", public: true)]
     #[Docs\Endpoint("Authenticate user")]
     #[Docs\Throws(code: 401, description: "Invalid credentials")]
     public function authenticate(
-        #[API\Parameter(source: "body")]
+        #[API\Body]
         #[Assert\NotEmpty]
         #[Docs\Argument(example: "myLogin", description: "User login")]
         string $login,
 
-        #[API\Parameter(source: "body")]
+        #[API\Body]
         #[Docs\Argument(format: "password", example: "myPassword", description: "User password")]
         #[Assert\NotEmpty]
         string $password
     ): AuthenticateDTO {
+        $this->checkEnabled();
         $this->deactivateActiveToken();
 
         if ($this->auth->isCredentialsCorrect($login, $password)) {
@@ -60,12 +62,24 @@ class Auth {
     /**
      * @throws InternalErrorException
      */
-    #[API\Endpoint(path: "logoff", method: "GET")]
+    #[API\Get("logoff")]
     #[Docs\Endpoint("Log off")]
     public function logoff(): LogoffDTO {
+        $this->checkEnabled();
         $this->deactivateActiveToken();
 
         return new LogoffDTO();
+    }
+
+    /**
+     * Without the authorization (API_AUTH_ENABLED=false) there are no credentials nor tokens.
+     *
+     * @throws ApiException
+     */
+    protected function checkEnabled(): void {
+        if (!$this->auth->isEnabled()) {
+            throw new ApiException(["The authorization is disabled."], 404);
+        }
     }
 
     /**

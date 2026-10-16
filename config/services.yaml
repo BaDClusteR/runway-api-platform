@@ -4,11 +4,31 @@ services:
     arguments:
       apiPlatformVersion: '%api_platform_version'
 
-  ApiPlatform\Controller\IApiRouter:
-    class: ApiPlatform\Controller\ApiRouter
+  # The endpoints are the router routes, see ApiRouteProvider.
+  ApiPlatform\Router\ApiRouteProvider:
+    arguments:
+      pathPrefix: '%api_path_prefix'
+    tags:
+      - name: router.route_provider
 
+  ApiPlatform\Controller\IApiController:
+    class: ApiPlatform\Controller\ApiController
+
+  # JSON errors for the API paths, the other paths keep the default responses.
   ApiPlatform\Controller\ExceptionControllerDecorator:
     decorates: Runway\Controller\IExceptionController
+    arguments:
+      pathPrefix: '%api_path_prefix'
+
+  ApiPlatform\Controller\Controller404Decorator:
+    decorates: Runway\Controller\IController404
+    arguments:
+      pathPrefix: '%api_path_prefix'
+
+  ApiPlatform\Controller\MethodNotAllowedControllerDecorator:
+    decorates: Runway\Controller\IMethodNotAllowedController
+    arguments:
+      pathPrefix: '%api_path_prefix'
 
   ApiPlatform\Controller\System\IApiResponseController:
     class: ApiPlatform\Controller\System\ApiResponseController
@@ -44,6 +64,7 @@ services:
   ApiPlatform\Core\Singleton\IAuth:
     class: ApiPlatform\Core\Singleton\Auth
     arguments:
+      enabled: '#API_AUTH_ENABLED'
       key: '#API_CRYPTO_KEY'
       keyLength: '#API_CRYPTO_KEY_LENGTH'
 

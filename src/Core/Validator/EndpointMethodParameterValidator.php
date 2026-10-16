@@ -56,6 +56,15 @@ class EndpointMethodParameterValidator implements IEndpointMethodParameterValida
             $this->addError("{$parameter->name} is expected to be integer, float given ($value).");
         }
 
+        // A query value is a string: "true", "1", "yes", "on" and their opposites are booleans, "abc" is not.
+        if (
+            $parameter->type === "bool"
+            && !is_bool($parameter->value)
+            && filter_var($parameter->value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === null
+        ) {
+            $this->addError("{$parameter->name} is not a boolean.");
+        }
+
         if (
             !is_scalar($parameter->value)
             && in_array($parameter->type, $this->getStringParameterTypes(), true)

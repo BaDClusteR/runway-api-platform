@@ -8,7 +8,7 @@ use ApiPlatform\Attribute as API;
 use ApiPlatform\Endpoint\DTO\PingDTO;
 
 class Ping {
-    #[API\Endpoint(path: "ping", method: "GET")]
+    #[API\Get("ping")]
     public function ping(): PingDTO {
         return new PingDTO();
     }

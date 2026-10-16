@@ -1,2 +1,5 @@
 parameters:
   api_platform_version: 1.0.3
+
+  # The paths of the API endpoints start with it: the endpoint "chats/{chatId}" is "/api/chats/{chatId}".
+  api_path_prefix: '/api'

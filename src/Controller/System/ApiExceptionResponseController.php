@@ -21,10 +21,18 @@ class ApiExceptionResponseController implements IApiExceptionResponseController 
     ) {}
 
     public function getResponse(Throwable $exception): Response {
-        $this->logger->error(
-            "Uncaught API exception: {$exception->getMessage()}",
-            $this->getExceptionJsonData($exception, true)
-        );
+        // The client errors (404, 400, etc.) are expected: they don't need the trace nor the error level.
+        if ($this->isInternalError($exception)) {
+            $this->logger->error(
+                "Uncaught API exception: {$exception->getMessage()}",
+                $this->getExceptionJsonData($exception, true)
+            );
+        } else {
+            $this->logger->info(
+                "API error: {$exception->getMessage()}",
+                ['code' => $exception->getCode(), 'requestId' => $this->request->getRequestId()]
+            );
+        }
 
         return $this->apiResponseController->getResponse(
             $this->convertToResponseDTO(
@@ -60,7 +68,8 @@ class ApiExceptionResponseController implements IApiExceptionResponseController 
             $result += [
                 'file'                                    => $exception->getFile(),
                 'line'                                    => $exception->getLine(),
-                ($isForLogs ? 'exceptionTrace' : 'trace') => $exception->getTrace(),
+                // Without the arguments of the calls: they can contain passwords and personal data.
+                ($isForLogs ? 'exceptionTrace' : 'trace') => explode("\n", $exception->getTraceAsString()),
             ];
 
             if ($previous = $exception->getPrevious()) {

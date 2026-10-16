@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Core\Provider\EndpointMethodParameterValue;
 
+use ApiPlatform\Attribute\Parameter;
 use ApiPlatform\DTO\ApiEndpointArgumentFileDTO;
 use ApiPlatform\DTO\ApiMethodParameterDTO;
 use ApiPlatform\DTO\ApiRequestDTO;
@@ -23,13 +24,15 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
      * @throws BadRequestException
      */
     public function getEndpointMethodParameterValue(ApiMethodParameterDTO $parameter, ApiRequestDTO $request): mixed {
-        return match (strtolower($parameter->source)) {
-            "query" => $this->getQueryParameterValue($parameter),
-            "body"  => $this->getBodyParameterValue($parameter, $request),
-            "path"  => $this->getPathParameterValue($parameter, $request),
-            "file"  => $this->getFile($parameter, $request),
-            default => throw new InternalErrorException(
-                "Argument '{$parameter->argumentName}' has invalid source: '{$parameter->source}'. Allowed sources are GET, POST and PATH."
+        return match ($parameter->source) {
+            Parameter::SOURCE_QUERY => $this->getQueryParameterValue($parameter),
+            Parameter::SOURCE_BODY  => $this->getBodyParameterValue($parameter, $request),
+            Parameter::SOURCE_PATH  => $this->getPathParameterValue($parameter, $request),
+            Parameter::SOURCE_FILE  => $this->getFile($parameter, $request),
+            // Not taken from the request.
+            ''                      => $parameter->defaultValue,
+            default                 => throw new InternalErrorException(
+                "Argument '{$parameter->argumentName}' has invalid source: '{$parameter->source}'."
             ),
         };
     }
@@ -73,21 +76,15 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
     /**
      * @throws InternalErrorException
      */
+    /**
+     * The router has matched the path, so every placeholder has a value.
+     *
+     * @throws InternalErrorException
+     */
     protected function getPathParameterValue(ApiMethodParameterDTO $parameter, ApiRequestDTO $request): string {
-        $value = match ($parameter->name) {
-            "section"    => $request->section,
-            "subSection" => $request->subSection,
-            "identifier" => $request->identifier,
-            default      => throw new InternalErrorException(
-                "Invalid name for path argument '{$parameter->argumentName}': {$parameter->name}. Allowed values are 'section', 'subSection' and 'identifier'"
-            )
-        };
-
-        if ($value === null && $parameter->hasDefaultValue) {
-            $value = $parameter->defaultValue;
-        }
-
-        return $value;
+        return $request->pathParameters[$parameter->name] ?? throw new InternalErrorException(
+            "Path placeholder {{$parameter->name}} of argument '{$parameter->argumentName}' has no value."
+        );
     }
 
     /**

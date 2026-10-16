@@ -9,23 +9,38 @@ use DateMalformedStringException;
 use DateTime;
 use Runway\DataStorage\Exception\DBException;
 use Runway\DataStorage\QueryBuilder\Exception\QueryBuilderException;
+use ApiPlatform\Exception\InternalErrorException;
 use Runway\Env\Provider\IEnvVariablesProvider;
 use ApiPlatform\Core\ICrypto;
 use Runway\Model\Exception\ModelException;
 use Runway\Singleton\Container;
 
 class Auth implements IAuth {
+    /**
+     * The ENV values are typed by the parser ("true" is a bool, "32" is an int, an empty value is ""), so they are
+     * normalized here.
+     *
+     * @param mixed $enabled   API_AUTH_ENABLED: false makes every endpoint public (e.g. the access is limited by the
+     *                         web server). Enabled if not set or invalid.
+     * @param mixed $key       API_CRYPTO_KEY, required only if the authorization is enabled.
+     * @param mixed $keyLength API_CRYPTO_KEY_LENGTH, the token length, required only if the authorization is enabled.
+     */
     public function __construct(
         protected IEnvVariablesProvider $envVariablesProvider,
-        protected string                $key,
-        protected int                   $keyLength,
+        protected mixed                 $enabled = true,
+        protected mixed                 $key = null,
+        protected mixed                 $keyLength = null,
         protected string                $alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890_-",
         protected int                   $tokenTTL = 3600 * 24 * 30,
     ) {}
 
+    public function isEnabled(): bool {
+        return filter_var($this->enabled ?? true, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
+    }
+
     public function isCredentialsCorrect(string $login, string $password): bool {
         $data = "$login&&&$password";
-        $crypto = $this->getCrypto()->setKey($this->key);
+        $crypto = $this->getCrypto()->setKey($this->getKey());
 
         return $data === $crypto->decrypt(
                 $this->envVariablesProvider->getEnvVariable("API_AUTH_HASH")
@@ -89,7 +104,7 @@ class Auth implements IAuth {
 
         do {
             $result = "";
-            for ($i = 0; $i < $this->keyLength; $i++) {
+            for ($i = 0, $keyLength = $this->getKeyLength(); $i < $keyLength; $i++) {
                 /** @noinspection RandomApiMigrationInspection */
                 $result .= $this->alphabet[mt_rand(0, $alphabetLength - 2)];
             }
@@ -135,7 +150,23 @@ class Auth implements IAuth {
         return Container::getInstance()->getService(ICrypto::class);
     }
 
+    /**
+     * @throws InternalErrorException If the key length is not configured.
+     */
     public function getKeyLength(): int {
-        return $this->keyLength;
+        $keyLength = filter_var($this->keyLength, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
+
+        return ($keyLength !== false)
+            ? $keyLength
+            : throw new InternalErrorException('The authorization is not configured: API_CRYPTO_KEY_LENGTH is not set.');
+    }
+
+    /**
+     * @throws InternalErrorException If the key is not configured: an empty key would be a zero AES key.
+     */
+    protected function getKey(): string {
+        return (is_string($this->key) && $this->key !== '')
+            ? $this->key
+            : throw new InternalErrorException('The authorization is not configured: API_CRYPTO_KEY is not set.');
     }
 }

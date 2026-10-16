@@ -3,7 +3,7 @@ services:
     class: ApiPlatform\OpenAPI\OpenApiGenerator
     arguments:
       api: '@ApiPlatform\IApi'
-      endpointPrefix: '/api/'
+      endpointPrefix: '%api_path_prefix'
       tokenHeader: '#API_TOKEN_HEADER'
 
   ApiPlatform\OpenAPI\Provider\IOpenApiEndpointInfoProvider:

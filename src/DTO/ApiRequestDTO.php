@@ -8,14 +8,13 @@ use Runway\Request\Parameters\DTO\FileDTO;
 
 readonly class ApiRequestDTO {
     /**
-     * @param FileDTO[] $files
+     * @param array<string, string> $pathParameters Placeholder name => value.
+     * @param FileDTO[]             $files
      */
     public function __construct(
-        public ?string $section,
-        public ?string $subSection,
-        public ?string $identifier,
-        public string  $method,
-        public array   $body,
-        public array   $files,
+        public string $method,
+        public array  $pathParameters,
+        public array  $body,
+        public array  $files,
     ) {}
 }

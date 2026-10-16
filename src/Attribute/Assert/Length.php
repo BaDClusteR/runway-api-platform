@@ -17,7 +17,8 @@ class Length extends AAssertion {
 
     public function assert(ApiEndpointMethodParameterDTO $parameter): ApiParameterValidationResultDTO {
         $value = (string)$parameter->value;
-        $strLength = strlen($value);
+        // In characters, not bytes: "Привет" is 6 characters long.
+        $strLength = mb_strlen($value);
 
         if ($this->minLength !== null && $strLength < $this->minLength) {
             $this->addError(
@@ -25,7 +26,7 @@ class Length extends AAssertion {
             );
         }
 
-        if ($this->maxLength !== null && $value > $this->maxLength) {
+        if ($this->maxLength !== null && $strLength > $this->maxLength) {
             $this->addError(
                 "{$parameter->name} should be at most {$this->maxLength} characters long, $strLength given."
             );

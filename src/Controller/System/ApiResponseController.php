@@ -22,14 +22,8 @@ class ApiResponseController implements IApiResponseController {
     public function getResponse(ApiResponseDTO $response): IResponse {
         $responseCode = $this->getResponseCode($response);
 
-        $this->logger->debug(
-            "API response",
-            [
-                'code'    => $responseCode,
-                'data'    => $this->getResponseData($response),
-                'headers' => $response->headers
-            ]
-        );
+        // Without the data: it can contain tokens and personal data.
+        $this->logger->debug("API response", ['code' => $responseCode]);
 
         return $this->initResponse()
                     ->setCode($responseCode)
@@ -102,11 +96,38 @@ class ApiResponseController implements IApiResponseController {
         $this->response->addHeader('Content-Type', 'application/json');
     }
 
+    /**
+     * The CORS headers are sent only for the allowed origins (API_ALLOW_ORIGIN): a request of the API site itself has
+     * no "Origin" header or the same origin, and needs no CORS.
+     */
     protected function addCORSHeaders(): void {
+        $origin = (string)$this->request->getHeader('Origin');
+        $allowedOrigins = $this->getAllowedOrigins();
+        $isAnyOriginAllowed = in_array('*', $allowedOrigins, true);
+
+        if ($origin === '' || (!$isAnyOriginAllowed && !in_array($origin, $allowedOrigins, true))) {
+            return;
+        }
+
         $this->response->addHeaders([
-            'Access-Control-Allow-Origin'  => $this->envVariablesProvider->getEnvVariable("API_ALLOW_ORIGIN"),
-            'Access-Control-Allow-Methods' => $this->envVariablesProvider->getEnvVariable("API_ALLOW_METHODS"),
-            'Access-Control-Allow-Headers' => $this->envVariablesProvider->getEnvVariable("API_ALLOW_HEADERS"),
+            'Access-Control-Allow-Origin'  => $isAnyOriginAllowed ? '*' : $origin,
+            'Access-Control-Allow-Methods' => (string)$this->envVariablesProvider->getEnvVariable("API_ALLOW_METHODS"),
+            'Access-Control-Allow-Headers' => (string)$this->envVariablesProvider->getEnvVariable("API_ALLOW_HEADERS"),
+            // The response depends on the origin: a cache must not give it to another one.
+            'Vary'                         => 'Origin',
         ]);
+    }
+
+    /**
+     * @return string[] The origins of API_ALLOW_ORIGIN (comma-separated), e.g. ["https://app.example.com"] or ["*"].
+     */
+    protected function getAllowedOrigins(): array {
+        return array_values(array_filter(
+            array_map(
+                static fn(string $origin): string => rtrim(trim($origin), '/'),
+                explode(',', (string)$this->envVariablesProvider->getEnvVariable("API_ALLOW_ORIGIN"))
+            ),
+            static fn(string $origin): bool => $origin !== ''
+        ));
     }
 }

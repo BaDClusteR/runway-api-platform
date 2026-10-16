@@ -13,55 +13,42 @@ use ApiPlatform\DTO\ApiResponseDTO;
 use ApiPlatform\Exception\ApiException;
 use ApiPlatform\Exception\AuthorizationRequiredException;
 use ApiPlatform\Exception\BadRequestException;
-use ApiPlatform\Exception\EndpointNotFoundException;
 use ApiPlatform\Exception\InternalErrorException;
 use ApiPlatform\Core\Provider\EndpointMethodParameters\IEndpointMethodParametersProvider;
-use ApiPlatform\Core\Provider\Endpoints\IEndpointsProvider;
 use ApiPlatform\Core\Validator\IEndpointMethodParameterValidator;
-use Runway\Request\IRequest;
-use Runway\Request\IResponse;
 use Runway\Singleton\Container;
 
 class Api implements IApi {
     public function __construct(
-        protected IEndpointsProvider                $endpointsProvider,
         protected IEndpointMethodParametersProvider $parametersProvider,
         protected IEndpointMethodParameterValidator $parameterValidator,
-        protected IRequest                          $request,
         protected IAuth                             $auth,
         protected ITokenStorage                     $tokenStorage,
-        protected IResponse                         $response,
         protected string                            $apiPlatformVersion
     ) {}
 
-    /**
-     * @throws ApiException
-     */
-    public function execute(ApiRequestDTO $request): ApiResponseDTO {
-        if ($endpoint = $this->getRequestEndpoint($request)) {
-            if (!$this->isEndpointAccessible($endpoint)) {
-                throw new AuthorizationRequiredException();
-            }
-
-            $this->auth->updateTokenLastActiveDate(
-                $this->tokenStorage->getToken()
-            );
-
-            $parameters = $this->parametersProvider->getEndpointMethodParameters($endpoint, $request);
-
-            $this->validateEndpointMethodParameters($parameters);
-
-            return $this->callEndpointMethod($endpoint, $parameters);
+    public function execute(ApiEndpointDTO $endpoint, ApiRequestDTO $request): ApiResponseDTO {
+        if (!$this->isEndpointAccessible($endpoint)) {
+            throw new AuthorizationRequiredException();
         }
 
-        throw new EndpointNotFoundException(
-            $this->request->getPath(),
-            $this->request->getMethod()
-        );
+        $token = $this->tokenStorage->getToken();
+
+        // E.g. a public endpoint called without a token. Without the authorization there are no tokens at all.
+        if ($token !== '' && $this->auth->isEnabled()) {
+            $this->auth->updateTokenLastActiveDate($token);
+        }
+
+        $parameters = $this->parametersProvider->getEndpointMethodParameters($endpoint, $request);
+
+        $this->validateEndpointMethodParameters($parameters);
+
+        return $this->callEndpointMethod($endpoint, $parameters);
     }
 
     protected function isEndpointAccessible(ApiEndpointDTO $endpoint): bool {
         return $endpoint->isPublic
+            || !$this->auth->isEnabled()
             || $this->auth->isAuthenticated(
                 $this->tokenStorage->getToken()
             );
@@ -115,7 +102,8 @@ class Api implements IApi {
         return match ($type) {
             "int"    => (int)$value,
             "float"  => (float)$value,
-            "bool"   => (bool)$value,
+            // (bool)"false" would be true.
+            "bool"   => is_string($value) ? filter_var($value, FILTER_VALIDATE_BOOLEAN) : (bool)$value,
             "string" => (string)$value,
             "array"  => (array)$value,
             default  => $value
@@ -144,44 +132,6 @@ class Api implements IApi {
         if (!$isValidated) {
             throw new BadRequestException($errors);
         }
-    }
-
-    protected function getRequestEndpoint(ApiRequestDTO $request): ?ApiEndpointDTO {
-        $result = $this->findApiEndpointByPath(
-            $this->buildEndpointPath($request, true),
-            $request->method
-        );
-
-        $result ??= $this->findApiEndpointByPath(
-            $this->buildEndpointPath($request, false),
-            $request->method
-        );
-
-        return $result;
-    }
-
-    protected function findApiEndpointByPath(string $endpointPath, string $requestMethod): ?ApiEndpointDTO {
-        return array_find(
-            $this->endpointsProvider->getApiEndpoints(),
-            static fn(ApiEndpointDTO $endpoint) => (
-                $endpoint->path === $endpointPath
-                && $endpoint->requestMethod === $requestMethod
-            )
-        );
-    }
-
-    protected function buildEndpointPath(ApiRequestDTO $request, bool $withIdentifier): string {
-        $result = array_values(
-            array_filter([
-                $request->section,
-                $withIdentifier
-                    ? $request->identifier
-                    : null,
-                $request->subSection
-            ])
-        );
-
-        return implode("/", $result);
     }
 
     public function getVersion(): string {

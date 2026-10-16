@@ -1,0 +1,4 @@
+services:
+  ApiPlatform\Tests\Fixture\ChatEndpoints:
+    tags:
+      - name: api_endpoint_collection
