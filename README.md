@@ -47,7 +47,9 @@ The endpoints are the routes of the Runway router, so the router rules apply:
 - **Path:** an argument with the name of a placeholder gets its value. An `int`, `float` or `bool` argument limits the
   placeholder to such values (`/api/chats/abc` is not found). Another regexp can be set inline: `{slug<[a-z-]+>}`.
   `#[Api\Path('name')]` takes a placeholder with another name.
-- **Query, body, file:** `#[Api\Query]`, `#[Api\Body]`, `#[Api\File]`, optionally with the name in the request.
+- **Query, body, file:** `#[Api\Query]`, `#[Api\Body]`, `#[Api\File]`, optionally with the name in the request. A query
+  parameter is taken from the query string whatever the method (e.g. `DELETE files?path=...`), and from the form fields
+  of a request with a form too.
 - An argument without a source gets its default value.
 
 The mistakes (a placeholder without an argument, an argument without a source, etc.) are reported when the endpoints

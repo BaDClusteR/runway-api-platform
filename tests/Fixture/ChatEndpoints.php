@@ -62,6 +62,16 @@ class ChatEndpoints {
         return new ResultDTO(['chatId' => $chatId, 'pinned' => $pinned]);
     }
 
+    #[Api\Delete('files', public: true)]
+    public function deleteFile(int $chatId, #[Api\Query] string $path): ResultDTO {
+        return new ResultDTO(['chatId' => $chatId, 'path' => $path]);
+    }
+
+    #[Api\Post('chunks', public: true)]
+    public function appendChunk(int $chatId, #[Api\Query] int $offset): ResultDTO {
+        return new ResultDTO(['chatId' => $chatId, 'offset' => $offset]);
+    }
+
     #[Api\Get('tree', public: true)]
     public function tree(int $chatId): TreeDTO {
         return new TreeDTO([['type' => 'folder', 'children' => []]]);

@@ -14,6 +14,9 @@ use Runway\Request\Request;
  * tests/Fixture/ChatEndpoints.php).
  */
 class ApiRequestTest extends TestCase {
+    /** The form fields of the next request (see request()). */
+    protected array $form = [];
+
     /**
      * @param array<string, mixed> $expected
      */
@@ -60,7 +63,25 @@ class ApiRequestTest extends TestCase {
             'inline requirement'    => ['GET', '/api/chats/42/years/2026', ['chatId' => 42, 'year' => '2026']],
             'bool false'            => ['GET', '/api/chats/42/flags?pinned=false', ['chatId' => 42, 'pinned' => false]],
             'bool true'             => ['GET', '/api/chats/42/flags?pinned=1', ['chatId' => 42, 'pinned' => true]],
+            // The query string, whatever the method.
+            'query of DELETE'       => [
+                'DELETE',
+                '/api/chats/42/files?path=a%2Fb%20c.txt',
+                ['chatId' => 42, 'path' => 'a/b c.txt'],
+            ],
+            'query of POST'         => ['POST', '/api/chats/42/chunks?offset=8', ['chatId' => 42, 'offset' => 8]],
         ];
+    }
+
+    /**
+     * A query parameter of a POST request can come in the form, e.g. with the uploaded file.
+     */
+    public function testQueryParameterInForm(): void {
+        $this->form = ['offset' => '16'];
+        $response = $this->request('POST', '/api/chats/42/chunks');
+
+        self::assertSame(200, $response->getCode(), $response->getBody());
+        self::assertSame(['chatId' => 42, 'offset' => 16], json_decode($response->getBody(), true)['result']);
     }
 
     #[DataProvider('notFoundProvider')]
@@ -163,6 +184,8 @@ class ApiRequestTest extends TestCase {
         $_SERVER['REQUEST_URI'] = $uri;
         $_GET = [];
         parse_str((string)parse_url($uri, PHP_URL_QUERY), $_GET);
+        $_POST = $this->form;
+        $this->form = [];
 
         $request = Request::resetInstance();
         $request->setBody($body);

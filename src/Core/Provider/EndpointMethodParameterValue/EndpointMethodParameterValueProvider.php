@@ -38,24 +38,25 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
     }
 
     /**
+     * The query string, whatever the method (e.g. DELETE files?path=...). A request with a form (e.g. a POST with an
+     * uploaded file) can have the value among the form fields too.
+     *
      * @throws RequiredParameterNotProvidedException
      */
     protected function getQueryParameterValue(ApiMethodParameterDTO $parameter): mixed {
-        $hasParameter = $this->request->getMethod() === "GET"
-            ? $this->request->hasGetParameter($parameter->name)
-            : $this->request->hasPostParameter($parameter->name);
-
-        if (!$hasParameter) {
-            if ($parameter->hasDefaultValue) {
-                return $parameter->defaultValue;
-            }
-
-            throw new RequiredParameterNotProvidedException($parameter->name);
+        if ($this->request->hasGetParameter($parameter->name)) {
+            return $this->request->getGetParameter($parameter->name)->asRaw();
         }
 
-        return $this->request->getMethod() === "GET"
-            ? $this->request->getGetParameter($parameter->name)->asRaw()
-            : $this->request->getPostParameter($parameter->name)->asRaw();
+        if ($this->request->getMethod() !== "GET" && $this->request->hasPostParameter($parameter->name)) {
+            return $this->request->getPostParameter($parameter->name)->asRaw();
+        }
+
+        if ($parameter->hasDefaultValue) {
+            return $parameter->defaultValue;
+        }
+
+        throw new RequiredParameterNotProvidedException($parameter->name);
     }
 
     /**
