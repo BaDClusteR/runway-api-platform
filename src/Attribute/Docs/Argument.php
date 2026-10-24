@@ -8,6 +8,9 @@ use Attribute;
 
 #[Attribute(Attribute::TARGET_PARAMETER)]
 class Argument {
+    /**
+     * @param array<mixed> $enum The allowed values.
+     */
     public function __construct(
         public string $format = '',
         public array  $enum = [],

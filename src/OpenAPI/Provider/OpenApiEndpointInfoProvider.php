@@ -19,6 +19,7 @@ use ApiPlatform\OpenAPI\Provider\Response\IOpenApiEndpointResponseSchemaProvider
 use ReflectionClass;
 use ReflectionException;
 use ReflectionMethod;
+use ReflectionNamedType;
 use ReflectionParameter;
 
 class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
@@ -70,6 +71,9 @@ class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
         return $result;
     }
 
+    /**
+     * @param ReflectionClass<object> $classReflection
+     */
     protected function getGroupByClassReflection(ReflectionClass $classReflection): string {
         $groupAttributes = $classReflection->getAttributes(Group::class);
 
@@ -115,8 +119,9 @@ class OpenApiEndpointInfoProvider implements IOpenApiEndpointInfoProvider {
         if (
             array_any(
                 $methodReflection->getParameters(),
-                static fn(ReflectionParameter $parameter) =>
-                    $parameter->getType()?->getName() === ApiEndpointArgumentFileDTO::class
+                static fn(ReflectionParameter $parameter): bool =>
+                    ($type = $parameter->getType()) instanceof ReflectionNamedType
+                    && $type->getName() === ApiEndpointArgumentFileDTO::class
             )
         ) {
             return "multipart/form-data";

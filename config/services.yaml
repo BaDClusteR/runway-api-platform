@@ -32,9 +32,15 @@ services:
 
   ApiPlatform\Controller\System\IApiResponseController:
     class: ApiPlatform\Controller\System\ApiResponseController
+    arguments:
+      # The router requires a Response.
+      response: '@Runway\Request\IResponse'
 
   ApiPlatform\Controller\System\IApiExceptionResponseController:
     class: ApiPlatform\Controller\System\ApiExceptionResponseController
+
+  ApiPlatform\Core\Provider\AllowedOrigins\IAllowedOriginsProvider:
+    class: ApiPlatform\Core\Provider\AllowedOrigins\AllowedOriginsProvider
 
   ApiPlatform\Core\Provider\Endpoints\IEndpointsProvider:
     class: ApiPlatform\Core\Provider\Endpoints\EndpointsProvider

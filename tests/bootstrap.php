@@ -11,3 +11,6 @@ require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 // The fixture endpoints (see tests/Fixture) for the integration tests.
 PathsProvider::getInstance()->addConfigDirectory(__DIR__ . '/config');
+
+// The last one wins: the .env.local of the developer does not change the tests.
+PathsProvider::getInstance()->addEnvFilePath(__DIR__ . '/config/test.env');

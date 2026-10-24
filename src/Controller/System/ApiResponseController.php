@@ -4,24 +4,26 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Controller\System;
 
+use ApiPlatform\Core\Provider\AllowedOrigins\IAllowedOriginsProvider;
 use ApiPlatform\Core\Storage\ISessionCookie;
 use ApiPlatform\DTO\ApiResponseDTO;
 use Runway\Env\Provider\IEnvVariablesProvider;
 use Runway\Logger\ILogger;
 use Runway\Request\IRequest;
-use Runway\Request\IResponse;
+use Runway\Request\Response;
 use JsonException;
 
 class ApiResponseController implements IApiResponseController {
     public function __construct(
-        protected IEnvVariablesProvider $envVariablesProvider,
-        protected IResponse             $response,
-        protected ILogger               $logger,
-        protected IRequest              $request,
-        protected ISessionCookie        $sessionCookie
+        protected IEnvVariablesProvider   $envVariablesProvider,
+        protected Response                $response,
+        protected ILogger                 $logger,
+        protected IRequest                $request,
+        protected ISessionCookie          $sessionCookie,
+        protected IAllowedOriginsProvider $allowedOriginsProvider
     ) {}
 
-    public function getResponse(ApiResponseDTO $response): IResponse {
+    public function getResponse(ApiResponseDTO $response): Response {
         $responseCode = $this->getResponseCode($response);
         $body = $this->getResponseBody($response);
 
@@ -42,6 +44,9 @@ class ApiResponseController implements IApiResponseController {
                     ->setBody($body);
     }
 
+    /**
+     * @return array<mixed>
+     */
     protected function getResponseData(ApiResponseDTO $response): array {
         return is_object($response->data)
             ? get_object_vars($response->data)
@@ -58,13 +63,23 @@ class ApiResponseController implements IApiResponseController {
         return $response->code >= 200 && $response->code <= 299;
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function getResponseHeaders(ApiResponseDTO $response): array {
         return $response->headers + $this->getSystemHeaders();
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function getSystemHeaders(): array {
         return [
-            'X-Request-Id' => $this->request->getRequestId()
+            'X-Request-Id'           => $this->request->getRequestId(),
+            // The browser must not take the JSON for HTML or a script, e.g. an error with the requested path.
+            'X-Content-Type-Options' => 'nosniff',
+            // The data of the user and the tokens must not stay in the caches (e.g. of a proxy).
+            'Cache-Control'          => 'no-store',
         ];
     }
 
@@ -97,7 +112,7 @@ class ApiResponseController implements IApiResponseController {
         return null;
     }
 
-    protected function initResponse(): IResponse {
+    protected function initResponse(): Response {
         $this->addCORSHeaders();
         $this->setContentTypeHeader();
 
@@ -121,32 +136,23 @@ class ApiResponseController implements IApiResponseController {
      */
     protected function addCORSHeaders(): void {
         $origin = (string)$this->request->getHeader('Origin');
-        $allowedOrigins = $this->getAllowedOrigins();
-        $isAnyOriginAllowed = in_array('*', $allowedOrigins, true);
 
-        if ($origin === '' || (!$isAnyOriginAllowed && !in_array($origin, $allowedOrigins, true))) {
+        if (!$this->allowedOriginsProvider->isAllowed($origin)) {
             return;
         }
 
         $this->response->addHeaders([
-            'Access-Control-Allow-Origin'  => $isAnyOriginAllowed ? '*' : $origin,
-            'Access-Control-Allow-Methods' => (string)$this->envVariablesProvider->getEnvVariable("API_ALLOW_METHODS"),
-            'Access-Control-Allow-Headers' => (string)$this->envVariablesProvider->getEnvVariable("API_ALLOW_HEADERS"),
+            'Access-Control-Allow-Origin'  => $this->allowedOriginsProvider->isAnyAllowed() ? '*' : $origin,
+            'Access-Control-Allow-Methods' => $this->getEnvString('API_ALLOW_METHODS'),
+            'Access-Control-Allow-Headers' => $this->getEnvString('API_ALLOW_HEADERS'),
             // The response depends on the origin: a cache must not give it to another one.
             'Vary'                         => 'Origin',
         ]);
     }
 
-    /**
-     * @return string[] The origins of API_ALLOW_ORIGIN (comma-separated), e.g. ["https://app.example.com"] or ["*"].
-     */
-    protected function getAllowedOrigins(): array {
-        return array_values(array_filter(
-            array_map(
-                static fn(string $origin): string => rtrim(trim($origin), '/'),
-                explode(',', (string)$this->envVariablesProvider->getEnvVariable("API_ALLOW_ORIGIN"))
-            ),
-            static fn(string $origin): bool => $origin !== ''
-        ));
+    protected function getEnvString(string $name): string {
+        $value = $this->envVariablesProvider->getEnvVariable($name);
+
+        return is_scalar($value) ? (string)$value : '';
     }
 }

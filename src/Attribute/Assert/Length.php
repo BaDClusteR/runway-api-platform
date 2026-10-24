@@ -16,7 +16,7 @@ class Length extends AAssertion {
     ) {}
 
     public function assert(ApiEndpointMethodParameterDTO $parameter): ApiParameterValidationResultDTO {
-        $value = (string)$parameter->value;
+        $value = is_scalar($parameter->value) ? (string)$parameter->value : '';
         // In characters, not bytes: "Привет" is 6 characters long.
         $strLength = mb_strlen($value);
 

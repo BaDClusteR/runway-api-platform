@@ -17,8 +17,14 @@ class InMemoryAuthStorage implements IAuthStorage {
     /** @var array<string, StoredSessionDTO> Token hash => session. */
     public array $sessions = [];
 
+    /** @var array<string, array{ip: string, userAgent: string}> Token hash => the client of the session. */
+    public array $clients = [];
+
     /** @var array<array{ip: string, time: int}> */
     public array $attempts = [];
+
+    /** @var array<array{id: int, time: int}> */
+    public array $touches = [];
 
     public function getCredentials(): ?CredentialsDTO {
         return $this->credentials;
@@ -30,6 +36,7 @@ class InMemoryAuthStorage implements IAuthStorage {
 
     public function addSession(string $tokenHash, int $validUntil, string $ip, string $userAgent): void {
         $this->sessions[$tokenHash] = new StoredSessionDTO(count($this->sessions) + 1, $validUntil, time(), true);
+        $this->clients[$tokenHash] = ['ip' => $ip, 'userAgent' => $userAgent];
     }
 
     public function findSession(string $tokenHash): ?StoredSessionDTO {
@@ -37,6 +44,7 @@ class InMemoryAuthStorage implements IAuthStorage {
     }
 
     public function touchSession(int $sessionId, int $time): void {
+        $this->touches[] = ['id' => $sessionId, 'time' => $time];
     }
 
     public function deactivateSession(string $tokenHash): void {

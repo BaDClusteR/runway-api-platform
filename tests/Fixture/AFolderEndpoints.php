@@ -15,11 +15,3 @@ abstract class AFolderEndpoints {
         return new ResultDTO(['folderId' => $folderId, 'name' => $name]);
     }
 }
-
-#[Api\Prefix('contact-folders')]
-class ContactFolderEndpoints extends AFolderEndpoints {
-}
-
-#[Api\Prefix('document-folders')]
-class DocumentFolderEndpoints extends AFolderEndpoints {
-}

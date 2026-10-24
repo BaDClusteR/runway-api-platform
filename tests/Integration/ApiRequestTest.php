@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace ApiPlatform\Tests\Integration;
 
+use ApiPlatform\Tests\Support\InProcessRequests;
 use PHPUnit\Framework\Attributes\DataProvider;
+use ApiPlatform\Tests\Support\ArrayPath;
 use PHPUnit\Framework\TestCase;
-use Runway\Request\IResponseRead;
-use Runway\Request\Request;
 
 /**
  * The whole request handling: the Runway router, the API route provider, the controller and the endpoint (see
  * tests/Fixture/ChatEndpoints.php).
  */
 class ApiRequestTest extends TestCase {
-    /** The form fields of the next request (see request()). */
-    protected array $form = [];
+    use ArrayPath;
+    use InProcessRequests;
 
     /**
      * @param array<string, mixed> $expected
@@ -26,9 +26,14 @@ class ApiRequestTest extends TestCase {
 
         self::assertSame(200, $response->getCode(), $response->getBody());
         self::assertSame('application/json', $response->getHeaders()['Content-Type']);
-        self::assertSame($expected, json_decode($response->getBody(), true)['result']);
+        self::assertSame('nosniff', $response->getHeaders()['X-Content-Type-Options']);
+        self::assertNotEmpty($response->getHeaders()['X-Request-Id']);
+        self::assertSame($expected, self::at($this->getJson($response), 'result'));
     }
 
+    /**
+     * @return array<string, array{string, string, array<string, mixed>, 3?: string}>
+     */
     public static function successfulRequestProvider(): array {
         return [
             'one placeholder'       => ['GET', '/api/chats/42', ['chatId' => 42]],
@@ -41,6 +46,12 @@ class ApiRequestTest extends TestCase {
             'default values'        => [
                 'GET',
                 '/api/chats/42/messages',
+                ['chatId' => 42, 'number' => null, 'direction' => 'before', 'isInternal' => false],
+            ],
+            // Not taken from the request.
+            'argument without source' => [
+                'GET',
+                '/api/chats/42/messages?isInternal=1',
                 ['chatId' => 42, 'number' => null, 'direction' => 'before', 'isInternal' => false],
             ],
             'static segment wins'   => ['GET', '/api/chats/42/messages/latest', ['chatId' => 42, 'latest' => true]],
@@ -61,6 +72,13 @@ class ApiRequestTest extends TestCase {
                 ['chatId' => 42, 'filename' => 'photo.jpg'],
             ],
             'inline requirement'    => ['GET', '/api/chats/42/years/2026', ['chatId' => 42, 'year' => '2026']],
+            'negative id'           => ['GET', '/api/misc/items/-5', ['id' => -5]],
+            'float placeholders'    => [
+                'POST',
+                '/api/misc/points/1.5/2/true',
+                // 2.0 is 2 in JSON.
+                ['x' => 1.5, 'y' => 2, 'visible' => true],
+            ],
             'bool false'            => ['GET', '/api/chats/42/flags?pinned=false', ['chatId' => 42, 'pinned' => false]],
             'bool true'             => ['GET', '/api/chats/42/flags?pinned=1', ['chatId' => 42, 'pinned' => true]],
             // The query string, whatever the method.
@@ -70,6 +88,7 @@ class ApiRequestTest extends TestCase {
                 ['chatId' => 42, 'path' => 'a/b c.txt'],
             ],
             'query of POST'         => ['POST', '/api/chats/42/chunks?offset=8', ['chatId' => 42, 'offset' => 8]],
+            'validated'             => ['POST', '/api/misc/validated?count=3', ['code' => 'abc', 'count' => 3], '{"code": "abc"}'],
         ];
     }
 
@@ -77,11 +96,10 @@ class ApiRequestTest extends TestCase {
      * A query parameter of a POST request can come in the form, e.g. with the uploaded file.
      */
     public function testQueryParameterInForm(): void {
-        $this->form = ['offset' => '16'];
-        $response = $this->request('POST', '/api/chats/42/chunks');
+        $response = $this->request('POST', '/api/chats/42/chunks', form: ['offset' => '16']);
 
         self::assertSame(200, $response->getCode(), $response->getBody());
-        self::assertSame(['chatId' => 42, 'offset' => 16], json_decode($response->getBody(), true)['result']);
+        self::assertSame(['chatId' => 42, 'offset' => 16], self::at($this->getJson($response), 'result'));
     }
 
     #[DataProvider('notFoundProvider')]
@@ -90,16 +108,21 @@ class ApiRequestTest extends TestCase {
 
         self::assertSame(404, $response->getCode());
         self::assertSame('application/json', $response->getHeaders()['Content-Type']);
-        self::assertSame(404, json_decode($response->getBody(), true)['errors'][0]['code']);
+        self::assertSame(404, self::at($this->getJson($response), 'errors', 0, 'code'));
     }
 
+    /**
+     * @return array<string, array{string}>
+     */
     public static function notFoundProvider(): array {
         return [
-            'unknown endpoint'       => ['/api/contacts'],
-            'not an int'             => ['/api/chats/abc'],
-            'inline requirement'     => ['/api/chats/42/years/26'],
-            'too many segments'      => ['/api/chats/42/chunks/3/more'],
-            'prefix only'            => ['/api'],
+            'unknown endpoint'   => ['/api/contacts'],
+            'not an int'         => ['/api/chats/abc'],
+            'not a float'        => ['/api/misc/points/1.5.1/2/true'],
+            'not a bool'         => ['/api/misc/points/1/2/yes'],
+            'inline requirement' => ['/api/chats/42/years/26'],
+            'too many segments'  => ['/api/chats/42/chunks/3/more'],
+            'prefix only'        => ['/api'],
         ];
     }
 
@@ -115,7 +138,7 @@ class ApiRequestTest extends TestCase {
 
         self::assertSame(405, $response->getCode());
         self::assertSame('PATCH, OPTIONS', $response->getHeaders()['Allow']);
-        self::assertSame(405, json_decode($response->getBody(), true)['errors'][0]['code']);
+        self::assertSame(405, self::at($this->getJson($response), 'errors', 0, 'code'));
     }
 
     public function testOptions(): void {
@@ -123,7 +146,23 @@ class ApiRequestTest extends TestCase {
 
         self::assertSame(204, $response->getCode());
         self::assertSame('GET, HEAD, OPTIONS', $response->getHeaders()['Allow']);
-        // No CORS without API_ALLOW_ORIGIN.
+        // No CORS for a request without the origin.
+        self::assertArrayNotHasKey('Access-Control-Allow-Origin', $response->getHeaders());
+    }
+
+    /**
+     * A CORS preflight of an allowed site (API_ALLOW_ORIGIN of tests/config/test.env).
+     */
+    public function testPreflight(): void {
+        $response = $this->request('OPTIONS', '/api/chats/42/messages/7/meta', headers: ['Origin' => 'https://app.example']);
+
+        self::assertSame(204, $response->getCode());
+        self::assertSame('https://app.example', $response->getHeaders()['Access-Control-Allow-Origin']);
+        self::assertSame('POST, GET, PUT, PATCH, DELETE, OPTIONS', $response->getHeaders()['Access-Control-Allow-Methods']);
+        self::assertSame('Content-Type, X-Token', $response->getHeaders()['Access-Control-Allow-Headers']);
+
+        $response = $this->request('OPTIONS', '/api/chats/42/messages/7/meta', headers: ['Origin' => 'https://evil.example']);
+
         self::assertArrayNotHasKey('Access-Control-Allow-Origin', $response->getHeaders());
     }
 
@@ -131,14 +170,41 @@ class ApiRequestTest extends TestCase {
         $response = $this->request('GET', '/api/chats/42/messages?number=abc');
 
         self::assertSame(400, $response->getCode());
-        self::assertStringContainsString('number is not a number', $response->getBody());
+        self::assertSame([['code' => 400, 'message' => 'number is not a number.']], self::at($this->getJson($response), 'errors'));
+    }
+
+    public function testValidationErrorsOfAllArguments(): void {
+        $response = $this->request('POST', '/api/misc/validated?count=11', '{"code": "abcd"}');
+
+        self::assertSame(400, $response->getCode());
+        self::assertSame(
+            ['code should be at most 3 characters long, 4 given.', 'count should be 10 or less, 11 given.'],
+            array_column(self::arrayAt($this->getJson($response), 'errors'), 'message')
+        );
+    }
+
+    /**
+     * The assertions are not applied to a value of another type: a client error, not "Array to string conversion".
+     */
+    public function testInvalidTypeWithAssertions(): void {
+        $response = $this->request('POST', '/api/misc/validated', '{"code": ["a"]}');
+
+        self::assertSame(400, $response->getCode());
+        self::assertSame([['code' => 400, 'message' => 'code is not a string.']], self::at($this->getJson($response), 'errors'));
+    }
+
+    public function testRequiredParameter(): void {
+        $response = $this->request('POST', '/api/misc/validated', '{}');
+
+        self::assertSame(400, $response->getCode());
+        self::assertSame('Required parameter code is not provided.', self::at($this->getJson($response), 'errors', 0, 'message'));
     }
 
     public function testInvalidBool(): void {
         $response = $this->request('GET', '/api/chats/42/flags?pinned=abc');
 
         self::assertSame(400, $response->getCode());
-        self::assertStringContainsString('pinned is not a boolean', $response->getBody());
+        self::assertSame('pinned is not a boolean.', self::at($this->getJson($response), 'errors', 0, 'message'));
     }
 
     public function testInvalidBody(): void {
@@ -147,54 +213,54 @@ class ApiRequestTest extends TestCase {
         self::assertSame(422, $response->getCode());
     }
 
+    /**
+     * A mistake of the endpoint (an unsupported argument type): the details are only in the log.
+     */
+    public function testInternalErrorIsHidden(): void {
+        $response = $this->request('GET', '/api/misc/mixed/a');
+
+        self::assertSame(500, $response->getCode());
+        self::assertSame(
+            [['code' => 500, 'message' => 'Internal server error']],
+            self::at($this->getJson($response), 'errors')
+        );
+    }
+
     public function testPrivateEndpointRequiresAuthorization(): void {
-        self::assertSame(401, $this->request('GET', '/api/chats/42/private')->getCode());
+        $response = $this->request('GET', '/api/chats/42/private');
+
+        self::assertSame(401, $response->getCode());
+        self::assertSame([['code' => 401, 'message' => 'Not authorized']], self::at($this->getJson($response), 'errors'));
     }
 
     /**
-     * A change with the session cookie from a page of another site (CSRF) is rejected, a request of a script (without
-     * the cookie) or of the site itself is not.
+     * A change from a page of another site (CSRF) is rejected, a request of a script (without the origin), of the site
+     * itself or of an allowed site (without the session cookie) is not.
      */
     #[DataProvider('originProvider')]
-    public function testOrigin(?string $cookie, string $origin, int $expectedCode): void {
-        $_SERVER['HTTP_HOST'] = 'archive.example';
-        $_SERVER['HTTP_ORIGIN'] = $origin;
-        $_COOKIE = ($cookie !== null) ? ['api_session' => $cookie] : [];
+    public function testOrigin(?string $cookie, ?string $origin, int $expectedCode): void {
+        $response = $this->request(
+            'PATCH',
+            '/api/chats/42/messages/7/meta',
+            '{"meta": {"a": "b"}}',
+            ['Host' => 'archive.example', ...(($origin !== null) ? ['Origin' => $origin] : [])],
+            ($cookie !== null) ? ['api_session' => $cookie] : []
+        );
 
-        try {
-            $response = $this->request('PATCH', '/api/chats/42/messages/7/meta', '{"meta": {"a": "b"}}');
-        } finally {
-            unset($_SERVER['HTTP_HOST'], $_SERVER['HTTP_ORIGIN']);
-            $_COOKIE = [];
-        }
-
-        self::assertSame($expectedCode, $response->getCode());
+        self::assertSame($expectedCode, $response->getCode(), $response->getBody());
     }
 
+    /**
+     * @return array<string, array{string|null, string|null, int}>
+     */
     public static function originProvider(): array {
         return [
             'another site with the cookie' => ['token', 'https://evil.example', 403],
+            'another site without cookie'  => [null, 'https://evil.example', 403],
             'the site itself'              => ['token', 'https://archive.example', 200],
-            'another site without cookie'  => [null, 'https://evil.example', 200],
+            'allowed site'                 => [null, 'https://app.example', 200],
+            'allowed site with the cookie' => ['token', 'https://app.example', 403],
+            'script'                       => ['token', null, 200],
         ];
-    }
-
-    protected function request(string $method, string $uri, string $body = ''): IResponseRead {
-        $_SERVER['REQUEST_METHOD'] = $method;
-        $_SERVER['REQUEST_URI'] = $uri;
-        $_GET = [];
-        parse_str((string)parse_url($uri, PHP_URL_QUERY), $_GET);
-        $_POST = $this->form;
-        $this->form = [];
-
-        $request = Request::resetInstance();
-        $request->setBody($body);
-
-        try {
-            return $request->process();
-        } finally {
-            // Request::process() sets the error handler of the request.
-            restore_error_handler();
-        }
     }
 }

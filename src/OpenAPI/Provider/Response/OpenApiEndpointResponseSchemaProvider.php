@@ -14,6 +14,7 @@ use ApiPlatform\OpenAPI\Enum\OpenApiEndpointParameterTypeEnum;
 use ApiPlatform\OpenAPI\Trait\OpenApiParameterTrait;
 use ReflectionClass;
 use ReflectionException;
+use ReflectionNamedType;
 use ReflectionProperty;
 use Runway\Logger\ILogger;
 
@@ -36,34 +37,48 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
             throw new InternalErrorException("Cannot get reflection of $endpoint->class::$endpoint->method");
         }
 
-        $returnType = $methodReflection->getReturnType()?->getName();
-        if (!class_exists($returnType)) {
+        $returnType = $methodReflection->getReturnType();
+        $returnTypeName = ($returnType instanceof ReflectionNamedType) ? $returnType->getName() : (string)$returnType;
+
+        if (!class_exists($returnTypeName)) {
             throw new InternalErrorException(
-                "Class $returnType returned by $endpoint->class::$endpoint->method does not exist"
+                "Class $returnTypeName returned by $endpoint->class::$endpoint->method does not exist"
             );
         }
 
-        return $this->getResponseSchemaDTOByFqn($returnType);
+        return $this->getResponseSchemaDTOByFqn($returnTypeName);
     }
 
+    /**
+     * The name of the schema in the components, e.g. "Auth.LoginDTO" for the DTOs of the platform endpoints.
+     */
     protected function getRefName(string $returnTypeFqn): string {
         return str_replace(
-            ['ApiPlatform\\API\\Endpoint\\DTO\\', '\\'],
+            ['ApiPlatform\\Endpoint\\DTO\\', '\\'],
             ['', '.'],
             $returnTypeFqn
         );
     }
 
+    /**
+     * @param ReflectionClass<object> $dtoReflection
+     */
     protected function getResponseSchemaDescription(ReflectionClass $dtoReflection): string {
         return (string)$this->getResponseInfoAttribute($dtoReflection)?->description;
     }
 
+    /**
+     * @param ReflectionClass<object> $dtoReflection
+     */
     protected function getResponseInfoAttribute(ReflectionClass $dtoReflection): ?Response {
-        return ($attrs = $dtoReflection->getAttributes(Response::class))
-            ? $attrs[0]->newInstance()
-            : null;
+        return $this->getFirstAttribute($dtoReflection, Response::class);
     }
 
+    /**
+     * @param ReflectionClass<object> $dtoReflection
+     *
+     * @return OpenApiEndpointResponseParameterDTO[]
+     */
     protected function getResponseSchema(ReflectionClass $dtoReflection): array {
         return array_map(
             fn(ReflectionProperty $prop): OpenApiEndpointResponseParameterDTO => $this->buildOpenApiResponseParameter(
@@ -73,12 +88,16 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
         );
     }
 
+    /**
+     * @param ReflectionClass<object> $responseDTOReflection
+     *
+     * @return ReflectionProperty[]
+     */
     protected function getResponseDTOProperties(ReflectionClass $responseDTOReflection): array {
         return $responseDTOReflection->getProperties(ReflectionProperty::IS_PUBLIC);
     }
 
     protected function buildOpenApiResponseParameter(ReflectionProperty $prop): OpenApiEndpointResponseParameterDTO {
-        /** @var Property|null $infoAttribute */
         $infoAttribute = $this->getFirstAttribute($prop, Property::class);
 
         [$min, $max] = $this->getParameterRange($prop);
@@ -106,16 +125,11 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
 
         if ($parameterType === OpenApiEndpointParameterTypeEnum::TYPE_OBJECT) {
             try {
-                return $this->getResponseSchemaDTOByFqn(
-                    (string)$prop->getType()?->getName()
-                );
+                return $this->getResponseSchemaDTOByFqn($this->getTypeName($prop));
             } catch (InternalErrorException) {
             }
         } elseif ($parameterType === OpenApiEndpointParameterTypeEnum::TYPE_ARRAY) {
-            /** @var Property|null $propAttribute */
-            $propAttribute = $this->getFirstAttribute($prop, Property::class);
-
-            $childrenType = (string)$propAttribute?->childrenType;
+            $childrenType = (string)$this->getFirstAttribute($prop, Property::class)?->childrenType;
 
             if ($this->isPrimitiveType($childrenType)) {
                 return $childrenType;
@@ -134,7 +148,8 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
         // "object" and "mixed" are free-form values: e.g. tree nodes of different kinds.
         return in_array(
             strtolower($type),
-            ['string', 'int', 'float', 'bool', 'object', 'mixed']
+            ['string', 'int', 'float', 'bool', 'object', 'mixed'],
+            true
         );
     }
 
@@ -142,14 +157,11 @@ class OpenApiEndpointResponseSchemaProvider implements IOpenApiEndpointResponseS
      * @throws InternalErrorException
      */
     protected function getResponseSchemaDTOByFqn(string $fqn): OpenApiEndpointResponseSchemaDTO {
-        try {
-            $returnTypeReflection = new ReflectionClass($fqn);
-        } catch (ReflectionException $e) {
-            throw new InternalErrorException(
-                "Cannot get reflection of $fqn: {$e->getMessage()}",
-                $e
-            );
+        if (!class_exists($fqn)) {
+            throw new InternalErrorException("Cannot get reflection of $fqn: the class does not exist");
         }
+
+        $returnTypeReflection = new ReflectionClass($fqn);
 
         return new OpenApiEndpointResponseSchemaDTO(
             schema: $this->getResponseSchema($returnTypeReflection),

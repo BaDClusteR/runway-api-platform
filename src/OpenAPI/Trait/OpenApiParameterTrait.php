@@ -11,6 +11,7 @@ use ApiPlatform\DTO\ApiEndpointArgumentFileDTO;
 use ApiPlatform\OpenAPI\Enum\OpenApiEndpointParameterTypeEnum;
 use ReflectionClass;
 use ReflectionException;
+use ReflectionNamedType;
 use ReflectionParameter;
 use ReflectionProperty;
 
@@ -18,9 +19,11 @@ trait OpenApiParameterTrait {
     protected function getParameterType(
         ReflectionParameter|ReflectionProperty $reflection
     ): OpenApiEndpointParameterTypeEnum {
-        return match (strtolower($reflection->getType()?->getName())) {
+        // The names of the built-in types are lowercase, the class names are compared as is.
+        return match ($this->getTypeName($reflection)) {
             "int"    => OpenApiEndpointParameterTypeEnum::TYPE_INTEGER,
             "float"  => OpenApiEndpointParameterTypeEnum::TYPE_NUMBER,
+            // The uploaded file is a string of the multipart form.
             "string", ApiEndpointArgumentFileDTO::class => OpenApiEndpointParameterTypeEnum::TYPE_STRING,
             "bool"   => OpenApiEndpointParameterTypeEnum::TYPE_BOOLEAN,
             "array"  => OpenApiEndpointParameterTypeEnum::TYPE_ARRAY,
@@ -28,14 +31,24 @@ trait OpenApiParameterTrait {
         };
     }
 
+    /**
+     * @return string Empty for no type or a union type (e.g. "int|string").
+     */
+    protected function getTypeName(ReflectionParameter|ReflectionProperty $reflection): string {
+        $type = $reflection->getType();
+
+        return ($type instanceof ReflectionNamedType) ? $type->getName() : '';
+    }
+
     protected function getParameterFormat(
         Argument|Property|null $infoAttribute
     ): string {
-        return ($infoAttribute?->source ?? null) === "file"
-            ? "binary"
-            : (string)$infoAttribute?->format;
+        return (string)$infoAttribute?->format;
     }
 
+    /**
+     * @return array<mixed>
+     */
     protected function getParameterEnum(
         Argument|Property|null $infoAttribute
     ): array {
@@ -59,75 +72,25 @@ trait OpenApiParameterTrait {
     }
 
     /**
-     * @return array{0: int|null, 1: int|null}
+     * @return array{0: int|float|null, 1: int|float|null} The minimum and the maximum of Range.
      */
     protected function getParameterRange(
         ReflectionParameter|ReflectionProperty $reflection,
     ): array {
-        $result = [null, null];
+        $range = $this->getFirstAttribute($reflection, Range::class);
 
-        foreach ($reflection->getAttributes(Range::class) as $attribute) {
-            /** @var Range $instance */
-            $instance = $attribute->newInstance();
-
-            if (
-                $instance->min !== null
-                && (
-                    $result[0] === null
-                    || $instance->min < $result[0]
-                )
-            ) {
-                $result[0] = $instance->min;
-            }
-
-            if (
-                $instance->max !== null
-                && (
-                    $result[1] === null
-                    || $instance->max > $result[1]
-                )
-            ) {
-                $result[1] = $instance->max;
-            }
-        }
-
-        return $result;
+        return [$range?->min, $range?->max];
     }
 
     /**
-     * @return array{0: int|null, 1: int|null}
+     * @return array{0: int|null, 1: int|null} The minimum and the maximum of Length.
      */
     protected function getParameterLength(
         ReflectionParameter|ReflectionProperty $reflection,
     ): array {
-        $result = [null, null];
+        $length = $this->getFirstAttribute($reflection, Length::class);
 
-        foreach ($reflection->getAttributes(Length::class) as $attribute) {
-            /** @var Length $instance */
-            $instance = $attribute->newInstance();
-
-            if (
-                $instance->minLength !== null
-                && (
-                    $result[0] === null
-                    || $instance->minLength < $result[0]
-                )
-            ) {
-                $result[0] = $instance->minLength;
-            }
-
-            if (
-                $instance->maxLength !== null
-                && (
-                    $result[1] === null
-                    || $instance->maxLength > $result[1]
-                )
-            ) {
-                $result[1] = $instance->maxLength;
-            }
-        }
-
-        return $result;
+        return [$length?->minLength, $length?->maxLength];
     }
 
     protected function isAllowEmptyValue(
@@ -136,10 +99,18 @@ trait OpenApiParameterTrait {
         return $this->getFirstAttribute($reflection, NotEmpty::class) === null;
     }
 
+    /**
+     * @template T of object
+     *
+     * @param ReflectionClass<object>|ReflectionParameter|ReflectionProperty $reflection
+     * @param class-string<T>                                                $attributeFqn
+     *
+     * @return T|null
+     */
     protected function getFirstAttribute(
         ReflectionClass|ReflectionParameter|ReflectionProperty $reflection,
         string                                                 $attributeFqn
-    ): mixed {
+    ): ?object {
         return ($attrs = $reflection->getAttributes($attributeFqn))
             ? $attrs[0]->newInstance()
             : null;

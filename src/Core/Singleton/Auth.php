@@ -15,7 +15,11 @@ use ApiPlatform\Exception\TooManyRequestsException;
  * storage does not reveal them. The failed logins are limited per IP address and for all the addresses together.
  */
 class Auth implements IAuth {
-    /** The bytes of a session token: it's a hex string of twice as many characters. */
+    /**
+     * The bytes of a session token: it's a hex string of twice as many characters.
+     *
+     * @var positive-int
+     */
     protected const int TOKEN_BYTES = 32;
 
     public const int MIN_PASSWORD_LENGTH = 10;
@@ -31,10 +35,14 @@ class Auth implements IAuth {
     /** The last activity of a session is updated not more often, in seconds. */
     protected const int TOUCH_INTERVAL = 60;
 
+    /** The hash checked when there are no credentials: it's made once. */
+    protected static ?string $dummyHash = null;
+
     /**
      * @param mixed $enabled    API_AUTH_ENABLED: false makes every endpoint public (e.g. the access is limited by the
-     *                          web server). Enabled if not set or invalid: the ENV values are typed by the parser ("true"
-     *                          is a bool, an empty value is ""), so it's normalized.
+     *                          web server). Enabled if not set, empty or invalid: only an explicit "false" (0, "off",
+     *                          "no") opens the API. The ENV values are typed by the parser ("true" is a bool, an empty
+     *                          value is ""), so it's normalized.
      * @param int   $sessionTtl In seconds.
      */
     public function __construct(
@@ -44,7 +52,11 @@ class Auth implements IAuth {
     ) {}
 
     public function isEnabled(): bool {
-        return filter_var($this->enabled ?? true, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
+        if ($this->enabled === null || $this->enabled === '') {
+            return true;
+        }
+
+        return filter_var($this->enabled, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true;
     }
 
     public function hasCredentials(): bool {
@@ -65,7 +77,7 @@ class Auth implements IAuth {
         $credentials = $this->storage->getCredentials();
 
         // The hash is checked anyway: the response time does not tell whether the credentials are set.
-        $isPasswordCorrect = password_verify($password, $credentials?->passwordHash ?? $this->getDummyHash());
+        $isPasswordCorrect = password_verify($password, ($credentials !== null) ? $credentials->passwordHash : $this->getDummyHash());
 
         if (!$credentials || !$isPasswordCorrect || !hash_equals($credentials->login, $login)) {
             $this->storage->addFailedAttempt($ip, $now);
@@ -139,8 +151,6 @@ class Auth implements IAuth {
     }
 
     protected function getDummyHash(): string {
-        static $hash = null;
-
-        return $hash ??= password_hash(random_bytes(16), $this->getAlgorithm());
+        return static::$dummyHash ??= password_hash(random_bytes(16), $this->getAlgorithm());
     }
 }

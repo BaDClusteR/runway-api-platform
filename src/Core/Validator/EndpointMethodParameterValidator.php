@@ -46,37 +46,11 @@ class EndpointMethodParameterValidator implements IEndpointMethodParameterValida
             return;
         }
 
-        if (
-            !is_numeric($parameter->value)
-            && in_array($parameter->type, $this->getNumericParameterTypes(), true)
-        ) {
-            $this->addError("{$parameter->name} is not a number.");
-        } elseif ($parameter->type === "int" && (float)$parameter->value !== round((float)$parameter->value)) {
-            $value = (float)$parameter->value;
-            $this->addError("{$parameter->name} is expected to be integer, float given ($value).");
-        }
+        $this->validateType($parameter);
 
-        // A query value is a string: "true", "1", "yes", "on" and their opposites are booleans, "abc" is not.
-        if (
-            $parameter->type === "bool"
-            && !is_bool($parameter->value)
-            && filter_var($parameter->value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === null
-        ) {
-            $this->addError("{$parameter->name} is not a boolean.");
-        }
-
-        if (
-            !is_scalar($parameter->value)
-            && in_array($parameter->type, $this->getStringParameterTypes(), true)
-        ) {
-            $this->addError("{$parameter->name} is not a string.");
-        }
-
-        if (
-            !is_array($parameter->value)
-            && in_array($parameter->type, $this->getArrayParameterTypes(), true)
-        ) {
-            $this->addError("{$parameter->name} is not an array.");
+        // The assertions expect a value of the type: e.g. Length of an array would be an error of PHP.
+        if ($this->errors) {
+            return;
         }
 
         foreach ($parameter->assertions as $assertion) {
@@ -85,6 +59,42 @@ class EndpointMethodParameterValidator implements IEndpointMethodParameterValida
             if (!$validationResult->isSuccessful) {
                 $this->addErrors($validationResult->errors);
             }
+        }
+    }
+
+    protected function validateType(ApiEndpointMethodParameterDTO $parameter): void {
+        $value = $parameter->value;
+
+        if (in_array($parameter->type, $this->getNumericParameterTypes(), true)) {
+            if (!is_numeric($value)) {
+                $this->addError("{$parameter->name} is not a number.");
+            } elseif ($parameter->type === "int" && (float)$value !== round((float)$value)) {
+                $value = (float)$value;
+                $this->addError("{$parameter->name} is expected to be integer, float given ($value).");
+            }
+        }
+
+        // A query value is a string: "true", "1", "yes", "on" and their opposites are booleans, "abc" is not.
+        if (
+            $parameter->type === "bool"
+            && !is_bool($value)
+            && (!is_scalar($value) || filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === null)
+        ) {
+            $this->addError("{$parameter->name} is not a boolean.");
+        }
+
+        if (
+            !is_scalar($value)
+            && in_array($parameter->type, $this->getStringParameterTypes(), true)
+        ) {
+            $this->addError("{$parameter->name} is not a string.");
+        }
+
+        if (
+            !is_array($value)
+            && in_array($parameter->type, $this->getArrayParameterTypes(), true)
+        ) {
+            $this->addError("{$parameter->name} is not an array.");
         }
     }
 
@@ -101,14 +111,23 @@ class EndpointMethodParameterValidator implements IEndpointMethodParameterValida
         ];
     }
 
+    /**
+     * @return string[]
+     */
     protected function getNumericParameterTypes(): array {
         return ["int", "float"];
     }
 
+    /**
+     * @return string[]
+     */
     protected function getStringParameterTypes(): array {
         return ["string"];
     }
 
+    /**
+     * @return string[]
+     */
     protected function getArrayParameterTypes(): array {
         return ["array"];
     }
@@ -117,6 +136,9 @@ class EndpointMethodParameterValidator implements IEndpointMethodParameterValida
         $this->errors[] = $error;
     }
 
+    /**
+     * @param string[] $errors
+     */
     protected function addErrors(array $errors): void {
         $this->errors = [...$this->errors, ...$errors];
     }

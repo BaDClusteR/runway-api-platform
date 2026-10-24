@@ -12,7 +12,6 @@ use ApiPlatform\DTO\ApiMethodParameterDTO;
 use ApiPlatform\Exception\EndpointDefinitionException;
 use ReflectionAttribute;
 use ReflectionClass;
-use ReflectionException;
 use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionParameter;
@@ -32,6 +31,8 @@ class EndpointsProvider implements IEndpointsProvider {
     /**
      * The values of the placeholders of these argument types are checked by the router: e.g. "/chats/abc" is not found
      * rather than called with chatId = 0. An inline requirement ("{id<-?\d+>}") wins.
+     *
+     * @var array<string, string> Argument type => regexp.
      */
     protected const array TYPE_REQUIREMENTS = [
         'int'   => '\d+',
@@ -39,6 +40,7 @@ class EndpointsProvider implements IEndpointsProvider {
         'bool'  => '0|1|true|false',
     ];
 
+    /** @var string[] */
     protected const array SOURCES = [
         Parameter::SOURCE_PATH,
         Parameter::SOURCE_QUERY,
@@ -52,8 +54,8 @@ class EndpointsProvider implements IEndpointsProvider {
     protected ?array $endpoints = null;
 
     /**
-     * @param array<object|class-string>|null $endpointServices By default, the services with the API_ENDPOINT_TAG_NAME
-     *                                                          tag.
+     * @param array<object|string>|null $endpointServices The services or the class names. By default, the services
+     *                                                    with the API_ENDPOINT_TAG_NAME tag.
      */
     public function __construct(
         protected IRouteCompiler $routeCompiler,
@@ -90,24 +92,28 @@ class EndpointsProvider implements IEndpointsProvider {
     }
 
     /**
-     * @return array<object|class-string>
+     * @return array<object|string>
      */
     protected function getEndpointServices(): array {
-        return $this->endpointServices ??= Container::getInstance()->getServicesByTag(static::API_ENDPOINT_TAG_NAME);
+        return $this->endpointServices ??= array_values(array_filter(
+            Container::getInstance()->getServicesByTag(static::API_ENDPOINT_TAG_NAME),
+            is_object(...)
+        ));
     }
 
     /**
+     * @param object|string $classInstanceOrFqn A service or a class name.
+     *
      * @return ApiEndpointDTO[]
      *
      * @throws EndpointDefinitionException
      */
     protected function getClassEndpoints(object|string $classInstanceOrFqn): array {
-        try {
-            $class = new ReflectionClass($classInstanceOrFqn);
-        } catch (ReflectionException $e) {
-            throw new EndpointDefinitionException($e->getMessage(), $e);
+        if (is_string($classInstanceOrFqn) && !class_exists($classInstanceOrFqn)) {
+            throw new EndpointDefinitionException("Class \"$classInstanceOrFqn\" of the endpoints does not exist.");
         }
 
+        $class = new ReflectionClass($classInstanceOrFqn);
         $prefix = $this->getClassPrefix($class);
         $endpoints = [];
 
@@ -129,17 +135,25 @@ class EndpointsProvider implements IEndpointsProvider {
         return $endpoints;
     }
 
+    /**
+     * @param ReflectionClass<object> $class
+     */
     protected function getClassPrefix(ReflectionClass $class): string {
         $attribute = $class->getAttributes(Prefix::class)[0] ?? null;
 
         return $attribute ? $attribute->newInstance()->path : '';
     }
 
+    /**
+     * @param ReflectionClass<object> $class
+     */
     protected function getRouteName(ReflectionClass $class, ReflectionMethod $method): string {
         return "api.{$class->getName()}::{$method->getName()}";
     }
 
     /**
+     * @param ReflectionClass<object> $class
+     *
      * @throws EndpointDefinitionException
      */
     protected function buildEndpoint(

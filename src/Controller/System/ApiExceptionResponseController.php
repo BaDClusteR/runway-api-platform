@@ -48,9 +48,12 @@ class ApiExceptionResponseController implements IApiExceptionResponseController 
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getExceptionJsonData(Throwable $exception, bool $isForLogs = false): array {
         $result = [
-            'errors'    => $this->getExceptionErrors($exception),
+            'errors'    => $this->getExceptionErrors($exception, $isForLogs),
             'requestId' => $this->request->getRequestId()
         ];
 
@@ -80,59 +83,38 @@ class ApiExceptionResponseController implements IApiExceptionResponseController 
         return $result;
     }
 
-    protected function getExceptionErrors(Throwable $exception): array {
-        if ($exception instanceof ApiException) {
-            return $this->getApiExceptionErrors($exception);
+    /**
+     * @return array<array{code: int, message: string}>
+     */
+    protected function getExceptionErrors(Throwable $exception, bool $isForLogs): array {
+        $code = $this->getErrorCode($exception);
+
+        // The messages of an internal error can tell about the code, the files and the data: only for the logs and
+        // the debug mode.
+        if (!$isForLogs && $this->isInternalError($exception) && !$this->isDebugMode()) {
+            return [['code' => $code, 'message' => 'Internal server error']];
         }
 
-        return [
-            [
-                'code'    => $this->getErrorCode($exception),
-                'message' => $this->getErrorMessage($exception)
-            ]
-        ];
-    }
-
-    protected function getApiExceptionErrors(ApiException $exception): array {
-        $errorCode = $exception->getCode();
+        $messages = ($exception instanceof ApiException) ? $exception->errors : [$exception->getMessage()];
 
         return array_map(
-            static fn(string $error): array => [
-                'code'    => $errorCode,
-                'message' => $error,
-            ],
-            $exception->errors
+            static fn(string $message): array => ['code' => $code, 'message' => $message],
+            $messages
         );
     }
 
-    protected function getErrorMessage(Throwable $exception): string {
-        if (
-            $this->isInternalError($exception)
-            && !$this->isDebugMode()
-        ) {
-            return "Internal server error";
-        }
-
-        return $exception->getMessage();
-    }
-
+    /**
+     * The code of an API exception, if it's an error code (4xx or 5xx): e.g. an ApiException without the code would
+     * be an invalid response.
+     */
     protected function getErrorCode(Throwable $exception): int {
-        if ($this->isAPIException($exception)) {
-            return $exception->getCode();
-        }
+        $code = $exception->getCode();
 
-        return 500;
+        return ($this->isAPIException($exception) && $code >= 400 && $code < 600) ? $code : 500;
     }
 
     protected function isInternalError(Throwable $exception): bool {
-        if (!$this->isAPIException($exception)) {
-            return true;
-        }
-
-        $code = $exception->getCode();
-
-        return $code >= 500
-            && $code < 600;
+        return $this->getErrorCode($exception) >= 500;
     }
 
     protected function isDebugMode(): bool {

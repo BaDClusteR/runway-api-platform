@@ -7,6 +7,7 @@ namespace ApiPlatform\Attribute\Assert;
 use ApiPlatform\DTO\ApiParameterValidationResultDTO;
 
 abstract class AAssertion implements IAssertion {
+    /** @var string[] */
     protected array $errors = [];
 
     protected function addError(string $errorText): void {

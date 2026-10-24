@@ -1,8 +1,12 @@
 parameters:
-  api_platform_version: 1.0.3
+  api_platform_version: 2.0.0
 
   # The paths of the API endpoints start with it: the endpoint "chats/{chatId}" is "/api/chats/{chatId}".
   api_path_prefix: '/api'
 
   # The session cookie of the browsers, see ISessionCookie.
   api_session_cookie: 'api_session'
+
+  # The title and the description of the OpenAPI spec ("GET schema").
+  api_title: 'API'
+  api_description: ''

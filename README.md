@@ -50,7 +50,12 @@ The endpoints are the routes of the Runway router, so the router rules apply:
 - **Query, body, file:** `#[Api\Query]`, `#[Api\Body]`, `#[Api\File]`, optionally with the name in the request. A query
   parameter is taken from the query string whatever the method (e.g. `DELETE files?path=...`), and from the form fields
   of a request with a form too.
+- **File:** an `ApiEndpointArgumentFileDTO` argument gets the uploaded file (only an uploaded one: not any file of the
+  server). An optional file (with a default value) can be left empty in the form.
 - An argument without a source gets its default value.
+- The values are checked by the argument types (`int`, `float`, `bool`, `string`, `array`) and the assertions
+  (`#[Assert\NotEmpty]`, `#[Assert\Length]`, `#[Assert\Range]`): the errors of all the arguments are in one
+  `400` response.
 
 The mistakes (a placeholder without an argument, an argument without a source, etc.) are reported when the endpoints
 are collected, not when the endpoint is called.
@@ -68,7 +73,10 @@ One user: its login and password hash (Argon2id) are in the `options` table, set
   to the logged-in clients.
 - The failed logins (the `login_attempts` table) are limited: 5 per IP address and 50 in total for 15 minutes, then
   the response is 429.
-- A change (not `GET`, `HEAD` or `OPTIONS`) made with the session cookie by a page of another site is rejected (403).
+- A change (not `GET`, `HEAD` or `OPTIONS`) made by a page of another site is rejected (403), unless the site is
+  allowed (`API_ALLOW_ORIGIN`) and the request has no session cookie: the browser adds the cookie, and the web server
+  can let the request in by the IP address or the cached basic auth (CSRF). A script sends no `Origin` header, a page
+  cannot send the token header without CORS.
 
 The tables (with the project prefix): `options (id, name, value)`, `tokens (id, token, generated, valid_until,
 last_active, ip, user_agent, server_info, expired, active)`, `login_attempts (id, ip, attempted)`.
@@ -78,12 +86,28 @@ last_active, ip, user_agent, server_info, expired, active)`, `login_attempts (id
 The ENV variables (see `.env`, override them in the project):
 
 - `API_AUTH_ENABLED`: `false` makes every endpoint public, e.g. when the access is limited by the web server (by IP,
-  basic auth, etc.). Then `auth/login` responds with 404.
+  basic auth, etc.). Then `auth/login` responds with 404. Only an explicit `false` (`0`, `off`, `no`) opens the API:
+  an empty or invalid value keeps the authorization.
 - `API_TOKEN_HEADER`: the header of the session token for the scripts, `X-Token` by default.
 - `API_ALLOW_ORIGIN`: comma-separated origins allowed to call the API from a browser on another site (CORS), `*` for
   any site. Empty by default: only the pages of the API site itself can call it.
-- `api_path_prefix` parameter: `/api` by default; `api_session_cookie`: the session cookie, `api_session` by default.
+- `api_path_prefix` parameter: `/api` by default; `api_session_cookie`: the session cookie, `api_session` by default;
+  `api_title`, `api_description`: the title and the description of the OpenAPI spec (`GET schema`).
 
-The errors of the API paths (including 404 and 405) are JSON. The details of the internal errors (the message, the
-file, the trace) are shown only with `APP_DEBUG=true`; the client errors (4xx) are logged at the info level, the
-internal ones at the error level, without the arguments of the calls.
+The errors of the API paths (including 404 and 405) are JSON. The responses have the `X-Request-Id`,
+`X-Content-Type-Options: nosniff` and `Cache-Control: no-store` headers (an endpoint response can set its own). The
+details of the internal errors (5xx: the message, the file, the trace) are shown only with `APP_DEBUG=true`; the client
+errors (4xx) are logged at the info level, the internal ones at the error level, without the arguments of the calls.
+
+## Development
+
+```shell
+composer test               # PHPUnit: the unit, integration and E2E tests
+composer test:unit          # the classes one by one
+composer test:integration   # the container in the process, SQLite in memory
+composer test:e2e           # HTTP requests to the PHP built-in server
+composer phpstan            # PHPStan, the max level
+composer infection          # mutation testing of the unit tests (pcov or Xdebug)
+```
+
+The tests need the `pdo_sqlite` extension. The CI runs them on Linux, macOS and Windows with PHP 8.4 and 8.5.

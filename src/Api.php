@@ -76,7 +76,7 @@ class Api implements IApi {
     /**
      * @param ApiEndpointMethodParameterDTO[] $parameters
      *
-     * @return array<string, int|float|string|array|null>
+     * @return array<string, mixed>
      */
     protected function buildEndpointMethodArguments(array $parameters): array {
         $result = [];
@@ -92,15 +92,20 @@ class Api implements IApi {
         return $result;
     }
 
+    /**
+     * The value is validated (see IEndpointMethodParameterValidator): e.g. an "int" one is numeric, an "array" one is
+     * an array.
+     */
     protected function castArgumentValueToType(mixed $value, string $type): mixed {
-        return match ($type) {
-            "int"    => (int)$value,
-            "float"  => (float)$value,
+        return match (true) {
+            $type === "int" && is_numeric($value)    => (int)$value,
+            $type === "float" && is_numeric($value)  => (float)$value,
             // (bool)"false" would be true.
-            "bool"   => is_string($value) ? filter_var($value, FILTER_VALIDATE_BOOLEAN) : (bool)$value,
-            "string" => (string)$value,
-            "array"  => (array)$value,
-            default  => $value
+            $type === "bool"                         => is_string($value)
+                ? filter_var($value, FILTER_VALIDATE_BOOLEAN)
+                : (bool)$value,
+            $type === "string" && is_scalar($value)  => (string)$value,
+            default                                  => $value
         };
     }
 

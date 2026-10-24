@@ -7,6 +7,9 @@ namespace ApiPlatform\OpenAPI\DTO;
 use ApiPlatform\OpenAPI\Enum\OpenApiEndpointParameterTypeEnum;
 
 readonly class OpenApiEndpointRequestParameterDTO {
+    /**
+     * @param array<mixed> $enum The allowed values.
+     */
     public function __construct(
         public string                           $name,
         public OpenApiEndpointParameterTypeEnum $type,
@@ -19,8 +22,8 @@ readonly class OpenApiEndpointRequestParameterDTO {
         public mixed                            $example = null,
         public bool                             $allowEmptyValue = true,
         public array                            $enum = [],
-        public ?int                             $minimum = null,
-        public ?int                             $maximum = null,
+        public int|float|null                   $minimum = null,
+        public int|float|null                   $maximum = null,
         public ?int                             $minLength = null,
         public ?int                             $maxLength = null,
     ) {}

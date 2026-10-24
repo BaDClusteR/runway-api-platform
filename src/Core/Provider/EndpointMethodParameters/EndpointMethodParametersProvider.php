@@ -14,6 +14,7 @@ use ApiPlatform\Exception\RequiredParameterNotProvidedException;
 use ReflectionAttribute;
 use ReflectionException;
 use ReflectionMethod;
+use ReflectionNamedType;
 use ReflectionParameter;
 
 class EndpointMethodParametersProvider implements IEndpointMethodParametersProvider {
@@ -61,13 +62,22 @@ class EndpointMethodParametersProvider implements IEndpointMethodParametersProvi
         return new ApiEndpointMethodParameterDTO(
             name: $methodParameter->name,
             argumentName: $methodParameter->argumentName,
-            type: (string)$parameter->getType()?->getName(),
+            type: $this->getTypeName($parameter),
             isNullable: $parameter->allowsNull(),
             value: $request
                 ? $this->valueProvider->getEndpointMethodParameterValue($methodParameter, $request)
                 : null,
             assertions: $this->getParameterAssertions($parameter)
         );
+    }
+
+    /**
+     * A union type (e.g. "int|string") is not supported: the validator reports it rather than PHP fails on it.
+     */
+    protected function getTypeName(ReflectionParameter $parameter): string {
+        $type = $parameter->getType();
+
+        return ($type instanceof ReflectionNamedType) ? $type->getName() : (string)$type;
     }
 
     /**

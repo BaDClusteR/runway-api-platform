@@ -83,11 +83,11 @@ class Auth {
     ): LoginDTO {
         $this->checkEnabled();
 
-        // A new login ends the current session of the client.
-        $this->auth->logOut($this->tokenStorage->getToken());
-
         $session = $this->auth->logIn($login, $password, $this->request->getIpAddress(), $this->request->getUserAgent())
             ?? throw new AuthFailedException();
+
+        // A new login ends the current session of the client (a failed one does not).
+        $this->auth->logOut($this->tokenStorage->getToken());
 
         if ($useCookie) {
             $this->sessionCookie->set($session->token, $session->validUntil);

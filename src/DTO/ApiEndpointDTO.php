@@ -12,6 +12,7 @@ readonly class ApiEndpointDTO {
      * @param array<string, string>                $requirements Placeholder name => regexp of its value (see
      *                                                           Runway\Router\Compiler\RouteCompiler).
      * @param array<string, ApiMethodParameterDTO> $parameters   The method arguments by name, with their sources.
+     * @param class-string                         $class        The class of the endpoint method.
      */
     public function __construct(
         public string $path,

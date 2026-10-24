@@ -75,9 +75,6 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
     }
 
     /**
-     * @throws InternalErrorException
-     */
-    /**
      * The router has matched the path, so every placeholder has a value.
      *
      * @throws InternalErrorException
@@ -89,34 +86,39 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
     }
 
     /**
+     * @return ApiEndpointArgumentFileDTO|mixed The default value if there is no file (and the argument has one).
+     *
      * @throws BadRequestException
      * @throws InternalErrorException
      */
-    protected function getFile(ApiMethodParameterDTO $parameter, ApiRequestDTO $request): ApiEndpointArgumentFileDTO {
-        if (isset($request->files[$parameter->name])) {
-            $file = $request->files[$parameter->name];
+    protected function getFile(ApiMethodParameterDTO $parameter, ApiRequestDTO $request): mixed {
+        $file = $request->files[$parameter->name] ?? null;
 
-            $uploadError = (int)$file->getError();
-
-            if ($uploadError !== UPLOAD_ERR_OK) {
-                $this->throwFileRelatedException($parameter->name, $uploadError);
+        // E.g. the file field of the form is left empty.
+        if ($file === null || (int)$file->getError() === UPLOAD_ERR_NO_FILE) {
+            if ($parameter->hasDefaultValue) {
+                return $parameter->defaultValue;
             }
 
-            // The endpoint can copy or move the file: it must be the uploaded one, not any file of the server.
-            if (!$this->isUploadedFile($file->getTmpName())) {
-                throw new BadRequestException(["File '$parameter->name' is not uploaded"]);
-            }
-
-            return new ApiEndpointArgumentFileDTO(
-                name: $file->getName(),
-                mimeType: $file->getType(),
-                tmpName: $file->getTmpName(),
-                size: $file->getSize(),
-            );
+            throw new BadRequestException(["Required file '$parameter->name' is not found in the request"]);
         }
 
-        throw new BadRequestException(
-            ["Required file '$parameter->name' is not found in the request"]
+        $uploadError = (int)$file->getError();
+
+        if ($uploadError !== UPLOAD_ERR_OK) {
+            $this->throwFileRelatedException($parameter->name, $uploadError);
+        }
+
+        // The endpoint can copy or move the file: it must be the uploaded one, not any file of the server.
+        if (!$this->isUploadedFile($file->getTmpName())) {
+            throw new BadRequestException(["File '$parameter->name' is not uploaded"]);
+        }
+
+        return new ApiEndpointArgumentFileDTO(
+            name: $file->getName(),
+            mimeType: $file->getType(),
+            tmpName: $file->getTmpName(),
+            size: $file->getSize(),
         );
     }
 
@@ -138,9 +140,6 @@ class EndpointMethodParameterValueProvider implements IEndpointMethodParameterVa
             );
             case UPLOAD_ERR_PARTIAL: throw new BadRequestException(
                 ["File '$parameterName': file was only partially uploaded"]
-            );
-            case UPLOAD_ERR_NO_FILE: throw new InternalErrorException(
-                "There is no file '$parameterName' uploaded."
             );
             case UPLOAD_ERR_NO_TMP_DIR: throw new InternalErrorException(
                 "Cannot upload file '$parameterName': missing a temporary folder"

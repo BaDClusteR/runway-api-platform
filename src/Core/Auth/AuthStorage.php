@@ -61,10 +61,10 @@ class AuthStorage implements IAuthStorage {
 
         return $row
             ? new StoredSessionDTO(
-                id: (int)$row['id'],
-                validUntil: (int)$row['valid_until'],
-                lastActive: (int)$row['last_active'],
-                isActive: (bool)$row['active'] && !$row['expired']
+                id: $this->toInt($row['id'] ?? null),
+                validUntil: $this->toInt($row['valid_until'] ?? null),
+                lastActive: $this->toInt($row['last_active'] ?? null),
+                isActive: $this->toInt($row['active'] ?? null) !== 0 && $this->toInt($row['expired'] ?? null) === 0
             )
             : null;
     }
@@ -97,11 +97,11 @@ class AuthStorage implements IAuthStorage {
     }
 
     public function countFailedAttempts(?string $ip, int $since): int {
-        return (int)$this->getDriver()->getFirstScalarResult(
+        return $this->toInt($this->getDriver()->getFirstScalarResult(
             'SELECT COUNT(*) FROM `{login_attempts}` WHERE attempted >= :since'
             . (($ip !== null) ? ' AND ip = :ip' : ''),
             ['since' => $since, ...(($ip !== null) ? ['ip' => $ip] : [])]
-        );
+        ));
     }
 
     public function clearFailedAttempts(string $ip): void {
@@ -114,13 +114,20 @@ class AuthStorage implements IAuthStorage {
             ['name' => $name]
         );
 
-        return ($value !== null && $value !== false) ? (string)$value : null;
+        return ($value !== false && is_scalar($value)) ? (string)$value : null;
     }
 
     protected function setOption(string $name, string $value): void {
         $driver = $this->getDriver();
         $driver->execute('DELETE FROM `{options}` WHERE name = :name', ['name' => $name]);
         $driver->execute('INSERT INTO `{options}` (name, value) VALUES (:name, :value)', ['name' => $name, 'value' => $value]);
+    }
+
+    /**
+     * A database gives the numbers as strings (e.g. MySQL) or as integers (e.g. SQLite).
+     */
+    protected function toInt(mixed $value): int {
+        return is_numeric($value) ? (int)$value : 0;
     }
 
     protected function getDriver(): IDataStorageDriver {

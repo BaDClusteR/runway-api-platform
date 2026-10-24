@@ -18,8 +18,6 @@ use ReflectionParameter;
 class OpenApiEndpointArgumentInfoProvider implements IOpenApiEndpointArgumentInfoProvider {
     use OpenApiParameterTrait;
 
-    protected ?array $parameterDTOs = null;
-
     public function __construct(
         protected IEndpointMethodParametersProvider $parametersProvider
     ) {}
@@ -66,6 +64,8 @@ class OpenApiEndpointArgumentInfoProvider implements IOpenApiEndpointArgumentInf
     }
 
     /**
+     * @param class-string $classFqn
+     *
      * @throws ReflectionException
      * @throws InternalErrorException
      */

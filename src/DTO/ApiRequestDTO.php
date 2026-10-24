@@ -9,7 +9,8 @@ use Runway\Request\Parameters\DTO\FileDTO;
 readonly class ApiRequestDTO {
     /**
      * @param array<string, string> $pathParameters Placeholder name => value.
-     * @param FileDTO[]             $files
+     * @param array<mixed>          $body           The decoded JSON body.
+     * @param FileDTO[]             $files          Field name => file.
      */
     public function __construct(
         public string $method,

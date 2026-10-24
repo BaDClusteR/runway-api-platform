@@ -8,6 +8,9 @@ use Attribute;
 
 #[Attribute(Attribute::TARGET_PROPERTY)]
 readonly class Property {
+    /**
+     * @param array<mixed> $enum The allowed values.
+     */
     public function __construct(
         public string $description = '',
         public string $format = '',

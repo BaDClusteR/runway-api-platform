@@ -17,16 +17,24 @@ use ApiPlatform\OpenAPI\Enum\OpenApiEndpointParameterTypeEnum;
 use ApiPlatform\OpenAPI\Provider\IOpenApiEndpointInfoProvider;
 
 class OpenApiGenerator implements IOpenApiGenerator {
+    /** @var array<string, array<string, mixed>> Path => method => operation. */
     protected array $paths = [];
 
+    /** @var array<string, array<string, mixed>> Name => schema. */
     protected array $schemas = [];
 
+    /**
+     * @param string $title       The title of the spec (api_title parameter).
+     * @param string $description The description of the spec (api_description parameter).
+     */
     public function __construct(
         protected IEndpointsProvider           $endpointsProvider,
         protected IOpenApiEndpointInfoProvider $endpointInfoProvider,
         protected IApi                         $api,
         protected string                       $endpointPrefix,
-        protected string                       $tokenHeader
+        protected string                       $tokenHeader,
+        protected string                       $title = 'API',
+        protected string                       $description = ''
     ) {}
 
     /**
@@ -46,6 +54,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getComponents(): array {
         ksort($this->schemas, SORT_STRING);
 
@@ -55,6 +66,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
         ];
     }
 
+    /**
+     * @return array<string, array<string, string>>
+     */
     protected function getSecuritySchemes(): array {
         return [
             'Token' => [
@@ -70,14 +84,20 @@ class OpenApiGenerator implements IOpenApiGenerator {
         return '3.0.0';
     }
 
+    /**
+     * @return array<string, string>
+     */
     protected function getInfo(): array {
         return [
-            'title'       => 'History API',
-            'description' => 'API spec of the BC History',
+            'title'       => $this->title,
+            'description' => $this->description,
             'version'     => $this->api->getVersion()
         ];
     }
 
+    /**
+     * @return array<array<string, string>>
+     */
     protected function getServers(): array {
         return [
             [
@@ -127,11 +147,12 @@ class OpenApiGenerator implements IOpenApiGenerator {
     }
 
     protected function isIncludeEndpointToDocs(ApiEndpointDTO $endpoint): bool {
-        return $endpoint->class !== Schema::class
-            && $endpoint->method !== "generateOpenApiSchema";
+        return !is_a($endpoint->class, Schema::class, true);
     }
 
     /**
+     * @return array<string, array<string, mixed>>
+     *
      * @throws InternalErrorException
      */
     protected function getEndpointPathInfo(ApiEndpointDTO $endpoint, OpenApiEndpointInfoDTO $endpointInfo): array {
@@ -141,6 +162,8 @@ class OpenApiGenerator implements IOpenApiGenerator {
     }
 
     /**
+     * @return array<string, mixed>
+     *
      * @throws InternalErrorException
      */
     protected function getEndpointInfo(OpenApiEndpointInfoDTO $endpointInfo): array {
@@ -160,6 +183,11 @@ class OpenApiGenerator implements IOpenApiGenerator {
 
         $result['responses'] = $this->getEndpointResponses($endpointInfo);
 
+        // The token of the security scheme (see getSecuritySchemes()).
+        if (!$endpointInfo->isPublic) {
+            $result['security'] = [['Token' => []]];
+        }
+
         if ($parameters = $this->getEndpointParameters($endpointInfo)) {
             $result['parameters'] = $parameters;
         }
@@ -168,10 +196,7 @@ class OpenApiGenerator implements IOpenApiGenerator {
             $result['requestBody'] = [
                 'content' => [
                     $endpointInfo->responseMimeType => [
-                        'schema' => [
-                            'type'       => "object",
-                            'properties' => $bodyParameters
-                        ]
+                        'schema' => $bodyParameters
                     ]
                 ]
             ];
@@ -182,18 +207,35 @@ class OpenApiGenerator implements IOpenApiGenerator {
         return $result;
     }
 
+    /**
+     * @return array<string, mixed> The schema of the body object, empty if there are no body parameters.
+     */
     protected function getEndpointBodyParameters(OpenApiEndpointInfoDTO $endpointInfo): array {
-        $parameters = [];
+        $properties = [];
+        $required = [];
 
         foreach ($this->getBodyParameters($endpointInfo) as $parameter) {
-            $parameters[$parameter->name] = $this->getEndpointParameterSchema(
-                $parameter
+            // The required properties are listed by the object, "allowEmptyValue" is for the query only.
+            $properties[$parameter->name] = array_diff_key(
+                $this->getEndpointParameterSchema($parameter),
+                array_flip(['required', 'allowEmptyValue'])
             );
+
+            if ($parameter->isRequired) {
+                $required[] = $parameter->name;
+            }
         }
 
-        return $parameters;
+        if (!$properties) {
+            return [];
+        }
+
+        return ['type' => 'object', 'properties' => $properties, ...($required ? ['required' => $required] : [])];
     }
 
+    /**
+     * @return array<array<string, mixed>>
+     */
     protected function getEndpointParameters(OpenApiEndpointInfoDTO $endpointInfo): array {
         $parameters = [];
 
@@ -221,6 +263,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
         return $parameters;
     }
 
+    /**
+     * @return OpenApiEndpointRequestParameterDTO[]
+     */
     protected function getRequestParameters(OpenApiEndpointInfoDTO $endpointInfo): array {
         return array_values(
             array_filter(
@@ -234,6 +279,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
         );
     }
 
+    /**
+     * @return OpenApiEndpointRequestParameterDTO[]
+     */
     protected function getBodyParameters(OpenApiEndpointInfoDTO $endpointInfo): array {
         return array_values(
             array_filter(
@@ -248,6 +296,8 @@ class OpenApiGenerator implements IOpenApiGenerator {
     }
 
     /**
+     * @return array<int|string, array<string, mixed>> Code => response.
+     *
      * @throws InternalErrorException
      */
     protected function getEndpointResponses(OpenApiEndpointInfoDTO $endpointInfo): array {
@@ -261,7 +311,7 @@ class OpenApiGenerator implements IOpenApiGenerator {
         }
 
         foreach ($endpointInfo->throws as $throw) {
-            $responses[(string)$throw->code] = $this->getErrorResponse($throw->description);
+            $responses[$throw->code] = $this->getErrorResponse($throw->description);
         }
 
         ksort($responses);
@@ -276,9 +326,16 @@ class OpenApiGenerator implements IOpenApiGenerator {
     }
 
     /**
+     * @return array<string, mixed>
+     *
      * @throws InternalErrorException
      */
     protected function getSuccessfulResponse(OpenApiEndpointInfoDTO $endpointInfo): array {
+        // "204 No Content" has no body.
+        if ($this->isApiResponseEmpty($endpointInfo)) {
+            return ['description' => $endpointInfo->responseSchema->description];
+        }
+
         return [
             'description' => $endpointInfo->responseSchema->description,
             'content'     => [
@@ -294,12 +351,11 @@ class OpenApiGenerator implements IOpenApiGenerator {
     }
 
     /**
-     * @throws InternalErrorException
-     */
-    /**
      * @param OpenApiEndpointResponseSchemaDTO|string $schema A DTO schema (it goes to the components), or a PHP type
      *                                                        name of a primitive or a free-form value ("object",
      *                                                        "mixed").
+     *
+     * @return array<string, string>
      *
      * @throws InternalErrorException
      */
@@ -337,6 +393,8 @@ class OpenApiGenerator implements IOpenApiGenerator {
     }
 
     /**
+     * @return array<string, mixed>
+     *
      * @throws InternalErrorException
      */
     protected function getFieldSchema(
@@ -368,6 +426,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
         return $this->getEndpointParameterSchema($field);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getEndpointParameterSchema(
         OpenApiEndpointResponseParameterDTO|OpenApiEndpointRequestParameterDTO $parameter
     ): array {
@@ -376,27 +437,40 @@ class OpenApiGenerator implements IOpenApiGenerator {
             'nullable' => $parameter->isNullable
         ];
 
-        foreach (["format", "description", "enum"] as $field) {
-            if (!empty($parameter->{$field})) {
-                $result[$field] = $parameter->{$field};
-            }
+        if ($parameter->format !== '') {
+            $result['format'] = $parameter->format;
         }
 
-        if (($parameter?->source ?? null) === "file") {
+        if ($parameter->description !== '') {
+            $result['description'] = $parameter->description;
+        }
+
+        if ($parameter->enum !== []) {
+            $result['enum'] = $parameter->enum;
+        }
+
+        if ($this->isFileParameter($parameter)) {
             $result['format'] = "binary";
         }
 
         foreach (
-            ["default", "example", "minimum", "maximum", "minLength", "maxLength", "allowEmptyValue"]
-            as $fieldName
+            [
+                'default'   => $parameter->default,
+                'example'   => $parameter->example,
+                'minimum'   => $parameter->minimum,
+                'maximum'   => $parameter->maximum,
+                'minLength' => $parameter->minLength,
+                'maxLength' => $parameter->maxLength,
+            ] as $fieldName => $value
         ) {
-            if (isset($parameter->{$fieldName})) {
-                $result[$fieldName] = $parameter->{$fieldName};
+            if ($value !== null) {
+                $result[$fieldName] = $value;
             }
         }
 
-        if (isset($parameter->isRequired)) {
-            $result["required"] = $parameter->isRequired;
+        if ($parameter instanceof OpenApiEndpointRequestParameterDTO) {
+            $result['allowEmptyValue'] = $parameter->allowEmptyValue;
+            $result['required'] = $parameter->isRequired;
         }
 
         return $result;
@@ -405,19 +479,34 @@ class OpenApiGenerator implements IOpenApiGenerator {
     protected function getEndpointParameterType(
         OpenApiEndpointResponseParameterDTO|OpenApiEndpointRequestParameterDTO $parameter
     ): OpenApiEndpointParameterTypeEnum {
-        return ($parameter?->source ?? null) === "file"
+        return $this->isFileParameter($parameter)
             ? OpenApiEndpointParameterTypeEnum::TYPE_STRING
             : $parameter->type;
     }
 
+    protected function isFileParameter(
+        OpenApiEndpointResponseParameterDTO|OpenApiEndpointRequestParameterDTO $parameter
+    ): bool {
+        return $parameter instanceof OpenApiEndpointRequestParameterDTO && $parameter->source === 'file';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     protected function getUnauthorizedResponse(): array {
         return $this->getErrorResponse("Unauthorized");
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getInternalErrorResponse(): array {
         return $this->getErrorResponse("Internal server error");
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     protected function getErrorResponse(string $description): array {
         return [
             'description' => $description,
@@ -431,6 +520,9 @@ class OpenApiGenerator implements IOpenApiGenerator {
         ];
     }
 
+    /**
+     * @return array<string, array<string, mixed>>
+     */
     protected function getErrorSchema(): array {
         return [
             'Error'        => [

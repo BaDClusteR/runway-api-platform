@@ -5,6 +5,8 @@ services:
       api: '@ApiPlatform\IApi'
       endpointPrefix: '%api_path_prefix'
       tokenHeader: '#API_TOKEN_HEADER'
+      title: '%api_title'
+      description: '%api_description'
 
   ApiPlatform\OpenAPI\Provider\IOpenApiEndpointInfoProvider:
     class: ApiPlatform\OpenAPI\Provider\OpenApiEndpointInfoProvider

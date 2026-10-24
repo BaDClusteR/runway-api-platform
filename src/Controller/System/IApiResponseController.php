@@ -3,8 +3,11 @@
 namespace ApiPlatform\Controller\System;
 
 use ApiPlatform\DTO\ApiResponseDTO;
-use Runway\Request\IResponse;
+use Runway\Request\Response;
 
 interface IApiResponseController {
-    public function getResponse(ApiResponseDTO $response): IResponse;
+    /**
+     * The JSON response: the CORS headers, the session cookie change, 204 for no data.
+     */
+    public function getResponse(ApiResponseDTO $response): Response;
 }

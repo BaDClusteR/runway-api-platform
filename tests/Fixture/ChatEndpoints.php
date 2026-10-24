@@ -41,6 +41,9 @@ class ChatEndpoints {
         return new ResultDTO(['chatId' => $chatId, 'latest' => true]);
     }
 
+    /**
+     * @param array<mixed> $meta
+     */
     #[Api\Patch('messages/{messageId}/meta', public: true)]
     public function updateMeta(int $chatId, int $messageId, #[Api\Body] array $meta): ResultDTO {
         return new ResultDTO(['chatId' => $chatId, 'messageId' => $messageId, 'meta' => $meta]);
