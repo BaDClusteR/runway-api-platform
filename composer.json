@@ -13,7 +13,7 @@
     "ext-dom": "*",
     "ext-mbstring": "*",
     "ext-zip": "*",
-    "bad_cluster/runway": "^2.0"
+    "bad_cluster/runway": "^2.0.1"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",

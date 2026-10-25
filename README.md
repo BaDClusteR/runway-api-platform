@@ -6,7 +6,7 @@ API platform for [Runway](https://github.com/BaDClusteR/runway).
 composer require bad_cluster/runway-api-platform:^2.0
 ```
 
-PHP 8.4+, Runway 2 (`bad_cluster/runway:^2.0`).
+PHP 8.4+, Runway 2 (`bad_cluster/runway:^2.0.1`).
 
 ## Endpoints
 
