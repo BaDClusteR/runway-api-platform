@@ -8,6 +8,8 @@ composer require bad_cluster/runway-api-platform:^2.0
 
 PHP 8.4+, Runway 2 (`bad_cluster/runway:^2.0.1`).
 
+The changes of the versions are in [CHANGELOG.md](CHANGELOG.md).
+
 ## Endpoints
 
 An endpoint is a public method of a service with the `api_endpoint_collection` tag. The method has an endpoint
