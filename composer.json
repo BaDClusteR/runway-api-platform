@@ -13,7 +13,7 @@
     "ext-dom": "*",
     "ext-mbstring": "*",
     "ext-zip": "*",
-    "bad_cluster/runway": "dev-main"
+    "bad_cluster/runway": "^2.0"
   },
   "require-dev": {
     "roave/security-advisories": "dev-latest",
@@ -37,8 +37,6 @@
     "phpstan": "phpstan --memory-limit=1G",
     "infection": "infection --threads=max"
   },
-  "minimum-stability": "dev",
-  "prefer-stable": true,
   "config": {
     "sort-packages": true,
     "allow-plugins": {

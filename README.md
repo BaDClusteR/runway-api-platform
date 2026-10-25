@@ -2,6 +2,12 @@
 
 API platform for [Runway](https://github.com/BaDClusteR/runway).
 
+```shell
+composer require bad_cluster/runway-api-platform:^2.0
+```
+
+PHP 8.4+, Runway 2 (`bad_cluster/runway:^2.0`).
+
 ## Endpoints
 
 An endpoint is a public method of a service with the `api_endpoint_collection` tag. The method has an endpoint
